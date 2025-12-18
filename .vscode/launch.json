@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // 1. 名字起得清楚点，一眼就知道是启动主服务
+            "name": "Dawnix: Launch Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            // 2. 关键修改：直接指向 main.go 的绝对位置
+            // 无论你当前打开哪个文件，按 F5 都会启动 cmd/server/main.go
+            "program": "${workspaceFolder}/cmd/server/main.go",
+            // 3. 关键修改：设置工作目录为项目根目录
+            // 这样你的代码里读取 "./configs/config.yaml" 才能找到文件
+            "cwd": "${workspaceFolder}",
+            // 4. 可选：设置环境变量（比如强制 Gin 开启 Debug 模式）
+            "env": {
+                "GIN_MODE": "debug"
+            }
+        }
+    ]
+}
