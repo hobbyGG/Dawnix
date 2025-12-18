@@ -40,7 +40,12 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd StartProcessIn
 		if err := json.Unmarshal(processDef.Structure, &graph); err != nil {
 			return fmt.Errorf("structure unmarshal failed, %w", err)
 		}
-
+		runtimeGraph := NewSchedulerGraph(&graph)
+		startEdges := runtimeGraph.Next[runtimeGraph.StartNode.ID]
+		if len(startEdges) != 1 {
+			return fmt.Errorf("start node should have only one outgoing edge")
+		}
+		firstProcessNodeID := startEdges[0].TargetNode
 		// 创建流程实例
 		variables, err := json.Marshal(cmd.Variables)
 		if err != nil {
@@ -53,7 +58,7 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd StartProcessIn
 			ParentID:          cmd.ParentID,
 			ParentNodeID:      cmd.ParentNodeID,
 			Variables:         variables,
-			ActiveTokens:      []string{},
+			ActiveTokens:      []string{firstProcessNodeID},
 			Status:            model.InstanceStatusPending,
 			SubmitterID:       cmd.SubmitterID,
 		}
@@ -65,11 +70,9 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd StartProcessIn
 		// 创建对应的任务
 		task := &model.ProcessTask{
 			InstanceID: instID,
-			NodeID:     "",       // 应该需要通过structure确认
-			Type:       "",       // 同上
-			Assignee:   "",       // 同上
-			Candidates: []byte{}, // 同上
-			// 后续不用填充
+			NodeID:     firstProcessNodeID,
+			Type:       model.TaskTypeUser,
+			Candidates: []byte("umep"),
 		}
 		if err = s.taskCmdRepo.Create(ctx, task); err != nil {
 			return fmt.Errorf("task create failed, %w", err)
@@ -79,16 +82,6 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd StartProcessIn
 	})
 
 	return instID, nil
-}
-
-func NewSchedulerGraphFromWorkflowGraph(wfGraph model.WorkflowGraph) *model.SchedulerGraph {
-	schedGraph := &model.SchedulerGraph{
-		Nodes: make(map[string]model.NodeConfig),
-	}
-	for _, node := range wfGraph.Nodes {
-		schedGraph.Nodes[node.ID] = node
-	}
-	return schedGraph
 }
 
 // 核心流转逻辑

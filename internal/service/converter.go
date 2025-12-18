@@ -15,7 +15,6 @@ func paramsToProcessDef(params *biz.ProcessDefinitionCreateParams) (*model.Proce
 	if err != nil {
 		return nil, fmt.Errorf("fail to marshal structure: %w", err)
 	}
-	configJson, err := json.Marshal(params.Config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to marshal config: %w", err)
 	}
@@ -24,6 +23,5 @@ func paramsToProcessDef(params *biz.ProcessDefinitionCreateParams) (*model.Proce
 		Code:      params.Code,
 		Name:      params.Name,
 		Structure: strctureJson,
-		Config:    configJson,
 	}, nil
 }

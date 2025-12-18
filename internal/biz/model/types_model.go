@@ -38,31 +38,3 @@ type EdgeConfig struct {
 	// 条件表达式，仅当SourceNode为网关时生效
 	Condition string `json:"condition"`
 }
-
-type SchedulerGraph struct {
-	Nodes map[string]NodeConfig // nodeID->NodeConfig的映射
-}
-
-// ProcessStructure 对应 ReactFlow 的导出对象
-type ProcessStructure struct {
-	// Nodes: 节点列表 (包含 id, type, data, position)
-	Nodes []map[string]interface{} `json:"nodes" binding:"required"`
-
-	// Edges: 连线列表 (包含 source, target, id)
-	Edges []map[string]interface{} `json:"edges" binding:"required"`
-
-	// Viewport: 视口状态 (x, y, zoom)，用于用户下次打开时恢复视角
-	Viewport map[string]interface{} `json:"viewport"`
-}
-
-// ProcessConfig 流程全局配置
-type ProcessConfig struct {
-	// AutoApprove: 是否开启自动去重/自动通过
-	AutoApprove bool `json:"auto_approve"`
-
-	// Timeout: 全局超时时间 (秒)，0表示不超时
-	Timeout int64 `json:"timeout"`
-
-	// CallbackURL: 流程结束后的回调地址 (Webhook)
-	CallbackURL string `json:"callback_url"`
-}
