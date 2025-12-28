@@ -15,9 +15,6 @@ func paramsToProcessDef(params *biz.ProcessDefinitionCreateParams) (*model.Proce
 	if err != nil {
 		return nil, fmt.Errorf("fail to marshal structure: %w", err)
 	}
-	if err != nil {
-		return nil, fmt.Errorf("fail to marshal config: %w", err)
-	}
 
 	return &model.ProcessDefinition{
 		Code:      params.Code,

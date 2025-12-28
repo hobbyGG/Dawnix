@@ -21,8 +21,7 @@ type ListInstancesParams struct {
 }
 
 type InstanceScheduler interface {
-	StartProcessInstance(ctx context.Context, cmd StartProcessInstanceCmd) (int64, error)
-	MoveToken(ctx context.Context, instance *model.ProcessInstance) error
+	StartProcessInstance(ctx context.Context, cmd *StartProcessInstanceCmd) (int64, error)
 }
 
 type StartProcessInstanceCmd struct {
@@ -32,4 +31,10 @@ type StartProcessInstanceCmd struct {
 	Variables    map[string]interface{} // 表单数据
 	ParentID     int64                  // 父流程id
 	ParentNodeID string                 // 父流程节点id
+}
+
+type CompleteTaskCmd struct {
+	Task   *model.ProcessTask
+	Action string
+	UserID int64 // 执行用户ID
 }

@@ -1,12 +1,14 @@
 package request
 
+import "github.com/hobbyGG/Dawnix/internal/biz"
+
 type GetTaskDetailReq struct {
 	ID int64 `uri:"id" binding:"required"`
 }
 
 type CompleteTaskReq struct {
 	// 任务 ID (路径参数)
-	ID int64 `uri:"id" binding:"required" json:"id"`
+	ID int64 `uri:"id"`
 
 	// 动作: "agree", "reject", "transfer"
 	Action string `json:"action" binding:"required"`
@@ -18,5 +20,14 @@ type CompleteTaskReq struct {
 	Variables map[string]interface{} `json:"variables"`
 
 	// 当前操作人 (Middleware 注入)
-	CurrentUserID string `json:"-"`
+	CurrentUserID int64 `json:"-"`
+}
+
+func (req *CompleteTaskReq) ToBizParams() *biz.CompleteTaskParams {
+	return &biz.CompleteTaskParams{
+		TaskID:  req.ID,
+		UserID:  req.CurrentUserID,
+		Action:  req.Action,
+		Comment: req.Comment,
+	}
 }

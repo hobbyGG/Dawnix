@@ -1,6 +1,7 @@
 package model
 
 import (
+	"slices"
 	"time"
 
 	"github.com/lib/pq"
@@ -36,10 +37,10 @@ type ProcessInstance struct {
 	// 关联模版 ID
 	DefinitionID int64 `gorm:"index;not null" json:"definition_id"`
 
-	// [建议新增] 冗余流程编码，方便不 Join 表直接查询所有 "leave_flow"
+	// 冗余流程编码，方便不 Join 表直接查询所有 "leave_flow"
 	ProcessCode string `gorm:"type:varchar(64);index;not null" json:"process_code"`
 
-	// [建议新增] 流程图快照 (核心！保护运行中实例不受模版变更影响)
+	// 流程图快照 (核心！保护运行中实例不受模版变更影响)
 	SnapshotStructure datatypes.JSON `gorm:"type:jsonb;not null" json:"snapshot_structure"`
 
 	// 父流程 ID (支持嵌套流程)
@@ -64,5 +65,38 @@ type ProcessInstance struct {
 }
 
 func (ProcessInstance) TableName() string {
+	
 	return "process_instances"
+}
+
+func (inst *ProcessInstance) ConsumeToken(nodeID string) {
+	// 1. 查找第一个匹配项的索引
+	idx := slices.Index(inst.ActiveTokens, nodeID)
+	if idx == -1 {
+		return // 没找到令牌，直接返回
+	}
+
+	// 2. 使用 slices.Delete 删除
+	// 注意：Delete 会处理好底层元素重排
+	inst.ActiveTokens = slices.Delete(inst.ActiveTokens, idx, idx+1)
+}
+
+// ProduceToken 产生（增加）一个新令牌，并去重
+func (i *ProcessInstance) ProduceToken(nodeID string) {
+	for _, t := range i.ActiveTokens {
+		if t == nodeID {
+			return // 已经存在，不再重复添加
+		}
+	}
+	i.ActiveTokens = append(i.ActiveTokens, nodeID)
+}
+
+// HasToken 检查是否存在某个令牌
+func (i *ProcessInstance) HasToken(nodeID string) bool {
+	for _, t := range i.ActiveTokens {
+		if t == nodeID {
+			return true
+		}
+	}
+	return false
 }

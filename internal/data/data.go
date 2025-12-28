@@ -52,7 +52,10 @@ type contextTxKey struct{}
 
 // 实现 InTx
 func (tm *transactionManager) InTx(ctx context.Context, fn func(ctx context.Context) error) error {
-	// 调用 GORM 的 Transaction 方法
+	// 检查 ctx 中是否已有事务
+	if tx := tm.getTxFromCtx(ctx); tx != nil {
+		return fn(ctx)
+	}
 	return tm.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// GORM 开启事务后，会传进来一个 tx 对象 (它也是 *gorm.DB)
 		// 我们把这个 tx 塞进 context 里，gorm
@@ -61,4 +64,11 @@ func (tm *transactionManager) InTx(ctx context.Context, fn func(ctx context.Cont
 		// 执行 Biz 层的闭包，把带 tx 的 context 传进去
 		return fn(ctxWithTx)
 	})
+}
+
+func (tm *transactionManager) getTxFromCtx(ctx context.Context) *gorm.DB {
+	if tx, ok := ctx.Value(contextTxKey{}).(*gorm.DB); ok {
+		return tx
+	}
+	return nil
 }

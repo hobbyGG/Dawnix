@@ -36,7 +36,8 @@ func (h *InstanceHandler) Create(c *gin.Context) {
 		return
 	}
 	// 调用服务层创建实例
-	id, err := h.svc.CreateInstance(c, req.ToBizCmd())
+	createInstacneCmd := req.ToBizCmd()
+	id, err := h.svc.CreateInstance(c, createInstacneCmd)
 	if err != nil {
 		h.logger.Error("failed to create instance", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

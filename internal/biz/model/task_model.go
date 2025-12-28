@@ -41,9 +41,9 @@ const (
 
 const (
 	TaskTypeUser    = "user_task"    // 人工审批
-	TaskTypeService = "service_task" // 系统自动执行 (异步)
+	TaskTypeService = "service_task" // 系统自动执行
 	TaskTypeReceive = "receive_task" // 等待外部回调
-	TaskTypeCc      = "cc_task"      // 抄送任务 (只读，不需要Token停留)
+	TaskTypeCc      = "cc_task"      // 抄送任务
 )
 
 type ProcessTask struct {
@@ -90,11 +90,22 @@ func (ProcessTask) TableName() string {
 	return "process_tasks"
 }
 
+// NewTask 创建一个新的 ProcessTask 实例
+func NewTask(inst *ProcessInstance, nodeID, taskType string) *ProcessTask {
+	return &ProcessTask{
+		InstanceID: inst.ID,
+		NodeID:     nodeID,
+		Type:       taskType,
+		Status:     TaskStatusPending,
+	}
+}
+
 // TaskView 这是你的【查询结果】，用于 CQRS 的读操作
 // 它不是一张表，它是多张表 Join 后的"投影"
 type TaskView struct {
-	TaskID        int64     `json:"task_id"`
+	ID            int64     `json:"id"`
 	TaskName      string    `json:"task_name"`
+	Status        string    `json:"status"`
 	ProcessTitle  string    `json:"process_title"`  // 来自 definition 表
 	SubmitterName string    `json:"submitter_name"` // 来自 instance 表
 	ArrivedAt     time.Time `json:"arrived_at"`

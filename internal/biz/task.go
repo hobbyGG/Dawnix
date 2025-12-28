@@ -9,6 +9,8 @@ import (
 
 type TaskCommandRepo interface {
 	Create(ctx context.Context, task *model.ProcessTask) error
+	GetByID(ctx context.Context, taskID int64) (*model.ProcessTask, error)
+	Update(ctx context.Context, task *model.ProcessTask) error
 }
 
 // ==========================================
@@ -48,4 +50,11 @@ type CreateTaskParams struct {
 
 	// 上下文变量快照 (可选)
 	Variables datatypes.JSON
+}
+
+type CompleteTaskParams struct {
+	TaskID  int64
+	Action  string
+	UserID  int64
+	Comment string
 }

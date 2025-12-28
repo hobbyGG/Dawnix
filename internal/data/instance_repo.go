@@ -46,5 +46,8 @@ func (repo *InstanceRepo) Delete(ctx context.Context, id int64) error {
 }
 
 func (repo *InstanceRepo) Update(ctx context.Context, model *model.ProcessInstance) error {
+	if err := repo.db.DB(ctx).WithContext(ctx).Save(model).Error; err != nil {
+		return err
+	}
 	return nil
 }

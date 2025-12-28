@@ -9,7 +9,7 @@ import (
 type ProcessDefinitionCreateParams struct {
 	Name      string
 	Code      string
-	Structure WorkflowGraph
+	Structure *model.GraphModel
 }
 
 type ProcessDefinitionListParams struct {

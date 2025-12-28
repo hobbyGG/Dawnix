@@ -19,7 +19,7 @@ func NewInstanceService(instanceRepo biz.InstanceRepo, scheduler biz.InstanceSch
 	return &InstanceService{instanceRepo: instanceRepo, scheduler: scheduler, logger: logger}
 }
 
-func (s *InstanceService) CreateInstance(ctx context.Context, cmd biz.StartProcessInstanceCmd) (int64, error) {
+func (s *InstanceService) CreateInstance(ctx context.Context, cmd *biz.StartProcessInstanceCmd) (int64, error) {
 	// 业务校验
 	// 对cmd的一些字段进行业务上的校验
 

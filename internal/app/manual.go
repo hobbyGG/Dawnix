@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/hobbyGG/Dawnix/internal/api"
 	"github.com/hobbyGG/Dawnix/internal/api/handler"
 	"github.com/hobbyGG/Dawnix/internal/biz"
@@ -42,14 +43,28 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 		return nil, fmt.Errorf("fail to initialize data layer: %w", err)
 	}
 
+	// data注入repo
 	helloRepo := data.NewHelloRepo(logger)
 	processDefinitionRepo := data.NewProcessDefinitionRepo(dataObj)
 	instanceRepo := data.NewInstanceRepo(dataObj)
 	TaskCmdRepo := data.NewCommandTaskRepo(dataObj)
 	TaskQueryRepo := data.NewQueryTaskRepo(dataObj)
 
+	// executor注入
+	executor := make(map[string]biz.NodeBehaviour)
+	executor[model.NodeTypeUserTask] = biz.NewUserNodeBehaviour(TaskCmdRepo)
+	navigator := biz.NewNavigator()
+	// 更多executor的注入......
+	// scheduler初始化
 	txManager := data.NewTransactionManager(db)
-	scheduler := biz.NewScheduler(txManager, processDefinitionRepo, instanceRepo, TaskCmdRepo)
+	scheduler := biz.NewScheduler(&biz.SchedulerDependencies{
+		TxManager:      txManager,
+		DefinitionRepo: processDefinitionRepo,
+		InstanceRepo:   instanceRepo,
+		TaskCmdRepo:    TaskCmdRepo,
+		Navigator:      navigator,
+		NodeExecutor:   executor,
+	})
 
 	helloSvc := service.NewHelloService(helloRepo, logger)
 	helloHandler := handler.NewHelloHandler(helloSvc, logger)
@@ -60,10 +75,17 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 	instanceSvc := service.NewInstanceService(instanceRepo, scheduler, logger)
 	instanceHandler := handler.NewInstanceHandler(instanceSvc, logger)
 
-	taskSvc := service.NewTaskService(TaskCmdRepo, TaskQueryRepo, logger)
+	taskSvc := service.NewTaskService(TaskCmdRepo, TaskQueryRepo, scheduler, logger)
 	taskHandler := handler.NewTaskHandler(taskSvc, logger)
 
 	r := api.NewRouter(helloHandler, processDefinitionHandler, instanceHandler, taskHandler)
+
+	// 允许跨域中间件配置
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://localhost:5173"} // 前端地址
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	r.Use(cors.New(config))
 
 	app := &App{
 		Server:  r,

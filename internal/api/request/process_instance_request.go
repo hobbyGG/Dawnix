@@ -18,8 +18,8 @@ type CreateInstanceReq struct {
 	ParentNodeID string `json:"parent_node_id"`
 }
 
-func (r *CreateInstanceReq) ToBizCmd() biz.StartProcessInstanceCmd {
-	return biz.StartProcessInstanceCmd{
+func (r *CreateInstanceReq) ToBizCmd() *biz.StartProcessInstanceCmd {
+	return &biz.StartProcessInstanceCmd{
 		ProcessCode:  r.ProcessCode,
 		SubmitterID:  r.SubmitterID,
 		Variables:    r.Variables,

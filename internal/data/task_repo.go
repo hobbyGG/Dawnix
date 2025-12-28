@@ -33,13 +33,18 @@ func (repo *TaskRepo) Create(ctx context.Context, task *model.ProcessTask) error
 	return nil
 }
 
+func (r *TaskRepo) GetByID(ctx context.Context, taskID int64) (*model.ProcessTask, error) {
+	var task model.ProcessTask
+	err := r.db.DB(ctx).WithContext(ctx).First(&task, taskID).Error
+	return &task, err
+}
+
 func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*model.TaskView, error) {
 	var result model.TaskView
 
-	// 这里的 SQL 逻辑是 CQRS 的精髓：Data 层负责解决数据的复杂性
 	err := r.db.DB(ctx).WithContext(ctx).Table("process_tasks as t").
 		Select(`
-			t.id as task_id,
+			t.id as id,
 			t.node_id as node_name,
 			t.status,
 			t.assignee,
@@ -56,9 +61,7 @@ func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*model.Task
 			i.id as instance_id,
 			i.submitter_id as submitter_name
 		`).
-		// 连表 Instance
 		Joins("LEFT JOIN process_instances i ON t.instance_id = i.id").
-		// 连表 Definition
 		Joins("LEFT JOIN process_definitions d ON i.definition_id = d.id").
 		Where("t.id = ?", taskID).
 		Scan(&result).Error
@@ -67,6 +70,13 @@ func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*model.Task
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (repo *TaskRepo) Update(ctx context.Context, task *model.ProcessTask) error {
+	if err := repo.db.DB(ctx).WithContext(ctx).Save(task).Error; err != nil {
+		return err
+	}
+	return nil
 }
 
 func (repo *TaskRepo) ListPending(ctx context.Context, params *biz.ListTasksParams) ([]*model.TaskView, error) {

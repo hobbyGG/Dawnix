@@ -1,6 +1,9 @@
 package request
 
-import "github.com/hobbyGG/Dawnix/internal/biz"
+import (
+	"github.com/hobbyGG/Dawnix/internal/biz"
+	"github.com/hobbyGG/Dawnix/internal/biz/model"
+)
 
 type ProcessDefinitionCreateReq struct {
 	Code      string           `json:"code"`                         // 流程模板业务号，用于创建流程
@@ -10,33 +13,33 @@ type ProcessDefinitionCreateReq struct {
 }
 
 func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateParams {
-	// 这里需要将 ProcessStructure 转换为 biz 所需的 WorkflowGraph 结构
-	workflowGraph := biz.WorkflowGraph{
-		Nodes: []biz.WorkflowNode{},
-		Edges: []biz.WorkflowEdge{},
+	// 这里需要将 ProcessStructure 转换为 graph结构
+	graph := model.GraphModel{
+		Nodes: []model.NodeModel{},
+		Edges: []model.EdgeModel{},
 	}
 	// 转换 Nodes
 	for _, node := range r.Structure.Nodes {
-		workflowNode := biz.WorkflowNode{
+		workflowNode := model.NodeModel{
 			ID:   node["id"].(string),
 			Type: node["type"].(string),
 			Name: node["name"].(string),
 		}
-		workflowGraph.Nodes = append(workflowGraph.Nodes, workflowNode)
+		graph.Nodes = append(graph.Nodes, workflowNode)
 	}
 	// 转换 Edges
 	for _, edge := range r.Structure.Edges {
-		workflowEdge := biz.WorkflowEdge{
+		workflowEdge := model.EdgeModel{
 			ID:         edge["id"].(string),
 			SourceNode: edge["source"].(string),
 			TargetNode: edge["target"].(string),
 		}
-		workflowGraph.Edges = append(workflowGraph.Edges, workflowEdge)
+		graph.Edges = append(graph.Edges, workflowEdge)
 	}
 	return &biz.ProcessDefinitionCreateParams{
 		Name:      r.Name,
 		Code:      r.Code,
-		Structure: workflowGraph,
+		Structure: &graph,
 	}
 }
 
