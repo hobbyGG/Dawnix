@@ -48,5 +48,8 @@ func (s *InstanceService) GetInstanceDetail(ctx context.Context, id int64) (*mod
 }
 
 func (s *InstanceService) DeleteInstance(ctx context.Context, id int64) error {
+	if err := s.instanceRepo.Delete(ctx, id); err != nil {
+		return fmt.Errorf("delete instance failed: %w", err)
+	}
 	return nil
 }

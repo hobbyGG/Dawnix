@@ -21,8 +21,9 @@ func NewTaskHandler(svc *service.TaskService, logger *zap.Logger) *TaskHandler {
 
 func (h *TaskHandler) Register(rg *gin.RouterGroup) {
 	// 在这里注册Task相关的路由
-	r := rg.Group("tasks")
+	r := rg.Group("task")
 	r.GET(":id", h.Detail)
+	r.GET("list", h.List)
 	r.POST("complete/:id", h.Complete)
 }
 
@@ -33,13 +34,39 @@ func (h *TaskHandler) Detail(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	taskDetail, err := h.svc.GetTaskDetail(c.Request.Context(), req.ID)
+	taskDetailView, err := h.svc.GetTaskDetailView(c.Request.Context(), req.ID)
 	if err != nil {
 		h.logger.Error("failed to get task detail", zap.Error(err))
 		c.JSON(http.StatusOK, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, taskDetail)
+	c.JSON(http.StatusOK, taskDetailView)
+}
+
+func (h *TaskHandler) List(c *gin.Context) {
+	// 处理获取任务列表的请求
+	req := new(request.ListTasksReq)
+	if err := c.ShouldBindQuery(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// 默认分页参数
+	if req.Page == 0 {
+		req.Page = 1
+	}
+	if req.Size == 0 {
+		req.Size = 10
+	}
+	ListTasksParams := req.ToBizParams()
+	ListTasksParams.UserID = "umep123" // TODO: 从中间件获取当前用户ID
+
+	taskListView, total, err := h.svc.ListTasksView(c.Request.Context(), ListTasksParams)
+	if err != nil {
+		h.logger.Error("failed to list tasks", zap.Error(err))
+		c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"total": total, "tasks": taskListView})
 }
 
 func (h *TaskHandler) Complete(c *gin.Context) {

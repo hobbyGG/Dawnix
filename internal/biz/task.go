@@ -20,12 +20,16 @@ type TaskCommandRepo interface {
 // ==========================================
 type TaskQueryRepo interface {
 	GetDetailView(ctx context.Context, taskID int64) (*model.TaskView, error)
-	ListPending(ctx context.Context, params *ListTasksParams) ([]*model.TaskView, error)
+	ListWithFilter(ctx context.Context, params *ListTasksParams) ([]*model.TaskView, int64, error)
 }
 
 type ListTasksParams struct {
-	Page int
-	Size int
+	Page      int
+	Size      int
+	Scope     string
+	Status    string
+	UserID    string // 当前用户ID (中间件注入)
+	Submitter string // 提交人ID
 }
 
 type CreateTaskParams struct {

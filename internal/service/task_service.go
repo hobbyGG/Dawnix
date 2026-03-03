@@ -21,12 +21,29 @@ func NewTaskService(cmd biz.TaskCommandRepo, query biz.TaskQueryRepo, scheduler 
 	return &TaskService{cmd: cmd, query: query, scheduler: scheduler, logger: logger}
 }
 
-func (s *TaskService) GetTaskDetail(ctx context.Context, taskID int64) (*model.TaskView, error) {
+func (s *TaskService) GetTaskDetailView(ctx context.Context, taskID int64) (*model.TaskView, error) {
 	detailView, err := s.query.GetDetailView(ctx, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task detail: %w", err)
 	}
 	return detailView, nil
+}
+
+func (s *TaskService) ListTasksView(ctx context.Context, params *biz.ListTasksParams) ([]*model.TaskView, int64, error) {
+	// 根据不同scope做处理
+	switch params.Scope {
+	case "my_todo":
+		params.Status = model.TaskStatusPending
+	case "my_completed":
+		params.Status = model.TaskStatusApproved
+	default:
+		return nil, 0, fmt.Errorf("unsupported task scope: %s", params.Scope)
+	}
+	taskViews, total, err := s.query.ListWithFilter(ctx, params)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list tasks: %w", err)
+	}
+	return taskViews, total, nil
 }
 
 func (s *TaskService) CompleteTask(ctx context.Context, params *biz.CompleteTaskParams) error {

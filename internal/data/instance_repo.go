@@ -42,7 +42,8 @@ func (repo *InstanceRepo) GetByID(ctx context.Context, id int64) (*model.Process
 	return &instance, nil
 }
 func (repo *InstanceRepo) Delete(ctx context.Context, id int64) error {
-	return nil
+	res := repo.db.DB(ctx).WithContext(ctx).Delete(&model.ProcessInstance{}, id)
+	return res.Error
 }
 
 func (repo *InstanceRepo) Update(ctx context.Context, model *model.ProcessInstance) error {

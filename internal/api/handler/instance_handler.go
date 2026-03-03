@@ -22,7 +22,7 @@ func (h *InstanceHandler) Register(rg *gin.RouterGroup) {
 	// 在这里注册Instance相关的路由
 	r := rg.Group("instance")
 	r.POST("create", h.Create)
-	r.POST("list", h.List)
+	r.GET("list", h.List)
 	r.GET(":id", h.Detail)
 	r.DELETE(":id", h.Delete)
 }
@@ -49,7 +49,7 @@ func (h *InstanceHandler) Create(c *gin.Context) {
 func (h *InstanceHandler) List(c *gin.Context) {
 	// 处理获取实例列表的请求
 	req := new(request.ListInstancesReq)
-	if err := c.ShouldBindJSON(req); err != nil {
+	if err := c.ShouldBindQuery(req); err != nil {
 		h.logger.Error("failed to bind ListInstancesReq", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -82,4 +82,16 @@ func (h *InstanceHandler) Detail(c *gin.Context) {
 
 func (h *InstanceHandler) Delete(c *gin.Context) {
 	// 处理删除实例的请求
+	req := new(request.DeleteInstanceReq)
+	if err := c.ShouldBindUri(req); err != nil {
+		h.logger.Error("failed to bind DeleteInstanceReq", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.svc.DeleteInstance(c, req.ID); err != nil {
+		h.logger.Error("failed to delete instance", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "deleted success"})
 }

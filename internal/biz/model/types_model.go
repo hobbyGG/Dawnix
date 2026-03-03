@@ -24,12 +24,10 @@ type GraphModel struct {
 }
 
 type NodeModel struct {
-	ID   string `json:"id"`   // 节点ID
-	Type string `json:"type"` // 节点类型
-	Name string `json:"name"` // 节点展示的名称
-
-	// 节点属性，不同节点配置不同
-	Properties map[string]interface{} `json:"properties"`
+	ID         string     `json:"id"`                   // 节点ID
+	Type       string     `json:"type"`                 // 节点类型
+	Name       string     `json:"name"`                 // 节点展示的名称
+	Candidates Candidates `json:"candidates,omitempty"` // 候选人，仅用户任务节点有效
 }
 
 func (n *NodeModel) IsAutoType() bool {
@@ -43,4 +41,8 @@ type EdgeModel struct {
 
 	// 条件表达式，仅当SourceNode为网关时生效
 	Condition string `json:"condition"`
+}
+
+type Candidates struct {
+	Users []string `json:"users"` // 用户列表
 }

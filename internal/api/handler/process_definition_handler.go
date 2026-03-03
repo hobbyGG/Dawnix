@@ -25,7 +25,7 @@ func (h *ProcessDefinitionHandler) Register(rg *gin.RouterGroup) {
 	r.POST("create", h.Create)
 
 	// 获取流程模板详情
-	r.POST("list", h.List)
+	r.GET("list", h.List)
 
 	// 获取流程模板列表
 	r.GET(":id", h.Detail)
@@ -56,7 +56,7 @@ func (h *ProcessDefinitionHandler) Create(c *gin.Context) {
 func (h *ProcessDefinitionHandler) List(c *gin.Context) {
 	// 处理获取流程模板列表的请求
 	req := new(request.ProcessDefinitionListReq)
-	if err := c.ShouldBindJSON(req); err != nil {
+	if err := c.ShouldBindQuery(req); err != nil {
 		h.logger.Error("failed to bind ProcessDefinitionListReq", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

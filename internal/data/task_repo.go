@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hobbyGG/Dawnix/internal/biz"
 	"github.com/hobbyGG/Dawnix/internal/biz/model"
@@ -72,24 +73,64 @@ func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*model.Task
 	return &result, nil
 }
 
+func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksParams) ([]*model.TaskView, int64, error) {
+	var results []*model.TaskView
+	var total int64
+
+	// 1. 基础查询：关联表
+	// 注意：这里不需要 Select，Select 留到最后 Fetch 数据时再做，避免 Count 时查询多余字段
+	db := r.db.DB(ctx).WithContext(ctx).Table("process_tasks as t").
+		Joins("LEFT JOIN process_instances i ON t.instance_id = i.id").
+		Joins("LEFT JOIN process_definitions d ON i.definition_id = d.id")
+
+	// 2. 状态过滤
+	if params.Status != "" {
+		db = db.Where("t.status = ?", params.Status)
+	}
+
+	// 3. 身份匹配 (核心修正)
+	if params.UserID != "" {
+		// 构造 JSON 数组字符串 ["user:123"]
+		userJSON := fmt.Sprintf("[%q]", params.UserID)
+
+		// 修正 GORM 写法：使用原生 SQL 字符串来保证 AND ( ... OR ... ) 的逻辑正确性
+		// 逻辑：Assignee 是我 OR (Assignee 为空/NULL AND 我在候选人Users里)
+		db = db.Where(
+			"t.assignee = ? OR ((t.assignee = '' OR t.assignee IS NULL) AND t.candidates->'users' @> ?)",
+			params.UserID,
+			userJSON,
+		)
+	}
+
+	// 4. 获取总数 (Count)
+	// 注意：Count 必须在 Limit/Offset 之前
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// 5. 执行分页与字段投影
+	// 这里的 Select 只影响最终的 Scan，不影响上面的 Count
+	selectSQL := `
+        t.id,
+        t.node_id as task_name,
+        t.status,
+        d.name as process_title,
+        i.submitter_id as submitter_name,
+        t.created_at as arrived_at
+    `
+
+	offset := (params.Page - 1) * params.Size
+	err := db.Select(selectSQL).
+		Order("t.created_at DESC").
+		Offset(offset).Limit(params.Size).
+		Scan(&results).Error
+
+	return results, total, err
+}
+
 func (repo *TaskRepo) Update(ctx context.Context, task *model.ProcessTask) error {
 	if err := repo.db.DB(ctx).WithContext(ctx).Save(task).Error; err != nil {
 		return err
 	}
 	return nil
-}
-
-func (repo *TaskRepo) ListPending(ctx context.Context, params *biz.ListTasksParams) ([]*model.TaskView, error) {
-	var tasks []*model.TaskView
-	query := repo.db.DB(ctx).WithContext(ctx).Table("process_tasks AS t").Select("t.id AS task_id, t.node_id AS task_name, d.title AS process_title, u.name AS submitter_name, t.created_at AS arrived_at").
-		Joins("JOIN process_instances AS i ON t.instance_id = i.id").
-		Joins("JOIN process_definitions AS d ON i.definition_id = d.id").
-		Joins("JOIN users AS u ON i.submitter_id = u.id").
-		Where("t.status = ?", model.TaskStatusPending).
-		Offset((params.Page - 1) * params.Size).
-		Limit(params.Size)
-	if err := query.Find(&tasks).Error; err != nil {
-		return nil, err
-	}
-	return tasks, nil
 }

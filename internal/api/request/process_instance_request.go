@@ -29,8 +29,8 @@ func (r *CreateInstanceReq) ToBizCmd() *biz.StartProcessInstanceCmd {
 }
 
 type ListInstancesReq struct {
-	Page int `json:"page" binding:"required,min=1"`
-	Size int `json:"size" binding:"required,min=1"`
+	Page int `form:"page" binding:"omitempty,min=1"`
+	Size int `form:"size" binding:"omitempty,min=1,max=100"`
 }
 
 func (r *ListInstancesReq) ToBizParams() *biz.ListInstancesParams {
@@ -42,4 +42,8 @@ func (r *ListInstancesReq) ToBizParams() *biz.ListInstancesParams {
 
 type GetInstanceDetailReq struct {
 	ID int64 `uri:"id" binding:"required"`
+}
+
+type DeleteInstanceReq struct {
+	ID int64 `uri:"id" binding:"required,min=1"`
 }
