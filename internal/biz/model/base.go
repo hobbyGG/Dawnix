@@ -23,6 +23,5 @@ type BaseModel struct {
 	UpdatedBy string `gorm:"type:varchar(64)" json:"updated_by"`
 
 	// 【乐观锁】
-	// 使用官方插件类型，GORM 会自动处理 version+1 和 where version=?
 	Revision optimisticlock.Version `json:"revision"`
 }

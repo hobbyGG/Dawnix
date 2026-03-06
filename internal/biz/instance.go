@@ -11,8 +11,10 @@ type InstanceRepo interface {
 	Create(ctx context.Context, model *model.ProcessInstance) (int64, error)
 	List(ctx context.Context, params *ListInstancesParams) ([]model.ProcessInstance, error)
 	GetByID(ctx context.Context, id int64) (*model.ProcessInstance, error)
+	GetWithExecutionsByID(ctx context.Context, id int64) (*model.ProcessInstance, []model.Execution, error)
 	Delete(ctx context.Context, id int64) error
 	Update(ctx context.Context, model *model.ProcessInstance) error
+	UpdateStatus(ctx context.Context, id int64, status string) error
 }
 
 type ListInstancesParams struct {
@@ -31,10 +33,4 @@ type StartProcessInstanceCmd struct {
 	Variables    map[string]interface{} // 表单数据
 	ParentID     int64                  // 父流程id
 	ParentNodeID string                 // 父流程节点id
-}
-
-type CompleteTaskCmd struct {
-	Task   *model.ProcessTask
-	Action string
-	UserID int64 // 执行用户ID
 }

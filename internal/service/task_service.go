@@ -13,11 +13,11 @@ import (
 type TaskService struct {
 	cmd       biz.TaskCommandRepo
 	query     biz.TaskQueryRepo
-	scheduler *biz.Scheduler
+	scheduler biz.TaskScheduler
 	logger    *zap.Logger
 }
 
-func NewTaskService(cmd biz.TaskCommandRepo, query biz.TaskQueryRepo, scheduler *biz.Scheduler, logger *zap.Logger) *TaskService {
+func NewTaskService(cmd biz.TaskCommandRepo, query biz.TaskQueryRepo, scheduler biz.TaskScheduler, logger *zap.Logger) *TaskService {
 	return &TaskService{cmd: cmd, query: query, scheduler: scheduler, logger: logger}
 }
 
@@ -63,13 +63,8 @@ func (s *TaskService) CompleteTask(ctx context.Context, params *biz.CompleteTask
 	now := time.Now()
 	task.FinishedAt = &now
 
-	completeTaskCmd := &biz.CompleteTaskCmd{
-		Task:   task,
-		Action: params.Action,
-		UserID: params.UserID,
-	}
 	// 3. 通知调度器完成任务
-	if err := s.scheduler.CompleteTask(ctx, completeTaskCmd); err != nil {
+	if err := s.scheduler.CompleteTask(ctx, task); err != nil {
 		return fmt.Errorf("failed to complete task in scheduler: %w", err)
 	}
 	if err := s.cmd.Update(ctx, task); err != nil {

@@ -4,63 +4,74 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/hobbyGG/Dawnix/internal/biz/model"
 )
 
+// 核心流程引擎
 type Scheduler struct {
 	txManager      TransactionManager
 	definitionRepo ProcessDefinitionRepo
 	instanceRepo   InstanceRepo
+	executionRepo  ExecutionRepo
 	taskCmdRepo    TaskCommandRepo
 	navigator      *Navigator
-	nodeExecutor   map[string]NodeBehaviour
+	nodeHandlers   map[string]NodeHandlerFunc // nodeType -> 到达该节点时的处理逻辑
 }
 
 type SchedulerDependencies struct {
 	TxManager      TransactionManager
 	DefinitionRepo ProcessDefinitionRepo
 	InstanceRepo   InstanceRepo
+	ExecutionRepo  ExecutionRepo
 	TaskCmdRepo    TaskCommandRepo
 	Navigator      *Navigator
-	NodeExecutor   map[string]NodeBehaviour
 }
 
 func NewScheduler(dependencies *SchedulerDependencies) *Scheduler {
+	nh := &nodeHandlers{
+		taskCmdRepo:   dependencies.TaskCmdRepo,
+		executionRepo: dependencies.ExecutionRepo,
+		instanceRepo:  dependencies.InstanceRepo,
+	}
 	return &Scheduler{
 		txManager:      dependencies.TxManager,
 		definitionRepo: dependencies.DefinitionRepo,
 		instanceRepo:   dependencies.InstanceRepo,
+		executionRepo:  dependencies.ExecutionRepo,
 		taskCmdRepo:    dependencies.TaskCmdRepo,
 		navigator:      dependencies.Navigator,
-		nodeExecutor:   dependencies.NodeExecutor,
+		nodeHandlers: map[string]NodeHandlerFunc{
+			model.NodeTypeUserTask: nh.userTask,
+			model.NodeTypeEnd:      nh.endNode,
+		},
 	}
 }
 
 // 接收service创建实例的意图
 func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd *StartProcessInstanceCmd) (int64, error) {
 	// 由流程引擎负责整个创建实例的流程
-	// 根据cmd的信息创建流程实例
 	var instID int64
 	err := s.txManager.InTx(ctx, func(ctx context.Context) error {
-		// 开启事务操作
 		// 根据code找到对应流程模板
 		processDef, err := s.definitionRepo.GetByCode(ctx, cmd.ProcessCode)
 		if err != nil {
 			return fmt.Errorf("Get definition failed, %w", err)
 		}
+
 		// 从def中拿到SchedulerGraph
 		var graph model.GraphModel
 		if err := json.Unmarshal(processDef.Structure, &graph); err != nil {
 			return fmt.Errorf("structure unmarshal failed, %w", err)
 		}
 		runtimeGraph := NewSchedulerRuntimeGraph(&graph)
-		// 创建流程实例
+
 		variables, err := json.Marshal(cmd.Variables)
 		if err != nil {
 			return fmt.Errorf("variables marshal failed, %w", err)
 		}
+
+		// 创建流程实例
 		inst := &model.ProcessInstance{
 			DefinitionID:      processDef.ID,
 			ProcessCode:       processDef.Code,
@@ -68,7 +79,6 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd *StartProcessI
 			ParentID:          cmd.ParentID,
 			ParentNodeID:      cmd.ParentNodeID,
 			Variables:         variables,
-			ActiveTokens:      []string{runtimeGraph.StartNode.ID}, // 初始令牌放在开始节点
 			Status:            model.InstanceStatusPending,
 			SubmitterID:       cmd.SubmitterID,
 		}
@@ -76,10 +86,27 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd *StartProcessI
 		if err != nil {
 			return fmt.Errorf("creatr instance failed, %w", err)
 		}
-		// 初始化后消费startToken，触发后续节点流转
-		if err := s.moveToken(ctx, inst, runtimeGraph, runtimeGraph.StartNode.ID); err != nil {
-			return fmt.Errorf("failed to move token: %w", err)
+
+		// 创建 Execution 记录
+		// NOTE: 暂时不考虑自动执行节点的情况
+		execParams := &model.Execution{
+			InstID: inst.ID,
+			NodeID: runtimeGraph.Next[runtimeGraph.StartNode.ID][0].TargetNode, // 从开始节点的下一跳开始执行
 		}
+		if err := s.executionRepo.Create(ctx, execParams); err != nil {
+			return fmt.Errorf("failed to create execution record: %w", err)
+		}
+
+		// 根据节点类型分派处理逻辑
+		firstNode := runtimeGraph.Nodes[execParams.NodeID]
+		handler, ok := s.nodeHandlers[firstNode.Type]
+		if !ok {
+			return fmt.Errorf("unknown node type: %s", firstNode.Type)
+		}
+		if err := handler(ctx, firstNode, execParams); err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -90,21 +117,26 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd *StartProcessI
 }
 
 // 接受service完成任务的意图
-func (s *Scheduler) CompleteTask(ctx context.Context, cmd *CompleteTaskCmd) error {
+func (s *Scheduler) CompleteTask(ctx context.Context, task *model.ProcessTask) error {
 	err := s.txManager.InTx(ctx, func(ctx context.Context) error {
-		inst, err := s.instanceRepo.GetByID(ctx, cmd.Task.InstanceID)
+		inst, err := s.instanceRepo.GetByID(ctx, task.InstanceID)
 		if err != nil {
 			return fmt.Errorf("failed to get instance by id: %w", err)
 		}
-		// 2. 解析流程定义，构建运行时图
+		// 2. 解析流程，构建运行时图
 		var graph model.GraphModel
 		if err := json.Unmarshal(inst.SnapshotStructure, &graph); err != nil {
 			return fmt.Errorf("structure unmarshal failed, %w", err)
 		}
 		runtimeGraph := NewSchedulerRuntimeGraph(&graph)
 		// 3. 驱动流程流转
-		if err := s.moveToken(ctx, inst, runtimeGraph, cmd.Task.NodeID); err != nil {
+		if err := s.moveToken(ctx, task.ExecutionID, runtimeGraph); err != nil {
 			return fmt.Errorf("failed to move token: %w", err)
+		}
+		// 4. 更新任务状态为已完成
+		task.Status = model.TaskStatusApproved
+		if err := s.taskCmdRepo.Update(ctx, task); err != nil {
+			return fmt.Errorf("failed to update task status: %w", err)
 		}
 		return nil
 	})
@@ -114,73 +146,35 @@ func (s *Scheduler) CompleteTask(ctx context.Context, cmd *CompleteTaskCmd) erro
 	return nil
 }
 
-func (s *Scheduler) moveToken(ctx context.Context, inst *model.ProcessInstance, rg *RuntimeGraph, nodeID string) error {
-	// 1. 消耗当前节点的 Token (原子操作，内存中移除)
-	inst.ConsumeToken(nodeID)
-
-	// 2. 寻找所有出路
-	initialPaths := s.navigator.FindPaths(rg, nodeID)
-	tokenQueue := tokenQueue{}
-	for _, edge := range initialPaths {
-		tokenQueue.Enqueue(edge.TargetNode)
-	}
-
-	burstVisited := make(map[string]bool)
-	// 3. BFS 推进 Token
-	for !tokenQueue.IsEmpty() {
-		currentTargetID, _ := tokenQueue.Dequeue()
-
-		targetNode, exists := rg.Nodes[currentTargetID]
-		if !exists {
-			return fmt.Errorf("target node %s not found", currentTargetID)
-		}
-
-		if targetNode.Type == model.NodeTypeEnd {
-			// 遇到结束节点：不执行任何逻辑，不产生新 Token
-			// 直接跳过，让 Token 消失 (Consumed)
-			continue
-		}
-
-		executor, exists := s.nodeExecutor[targetNode.Type]
-		if !exists {
-			return fmt.Errorf("unknown executor for type %s", targetNode.Type)
-		}
-
-		// 自动节点防死循环检测
-		if targetNode.IsAutoType() {
-			if burstVisited[currentTargetID] {
-				return fmt.Errorf("infinite loop detected at %s", currentTargetID)
-			}
-			burstVisited[currentTargetID] = true
-		}
-
-		// 执行节点逻辑
-		nodeContext := &NodeContext{ctx: ctx, inst: inst}
-		shouldContinue, err := executor.OnEnter(nodeContext, targetNode)
+// TODO: 如果有多条边，先根据条件算出下一跳，再流转
+func (s *Scheduler) moveToken(ctx context.Context, executionID int64, rg *RuntimeGraph) error {
+	return s.txManager.InTx(ctx, func(ctx context.Context) error {
+		exec, err := s.executionRepo.GetByID(ctx, executionID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get execution record: %w", err)
 		}
 
-		if shouldContinue {
-			// 情况一：自动节点 (如抄送、或者你定义的 RuleTask) -> 继续往下找
-			nextPaths := s.navigator.FindPaths(rg, currentTargetID)
-			for _, edge := range nextPaths {
-				tokenQueue.Enqueue(edge.TargetNode)
-			}
-		} else {
-			// 情况二：审批节点 (UserTask) -> 停下来，生成 Token
-			inst.ProduceToken(currentTargetID)
+		// 找到所有可流转的边
+		edges := rg.Next[exec.NodeID]
+		if len(edges) == 0 {
+			return fmt.Errorf("no outgoing edges from node %s", exec.NodeID)
 		}
-	}
+		if len(edges) > 1 {
+			return fmt.Errorf("multiple outgoing edges not supported yet")
+		}
 
-	// 4. 最终状态判定
-	// 只有当所有 Token 都被消耗掉（走到 End 节点被吞掉），且没有新 Token 生成时，流程才算结束
-	if len(inst.ActiveTokens) == 0 {
-		inst.Status = model.InstanceStatusApproved
-		now := time.Now()
-		inst.FinishedAt = &now
-	}
+		// 推进 token
+		exec.NodeID = edges[0].TargetNode
+		if err := s.executionRepo.Update(ctx, exec); err != nil {
+			return fmt.Errorf("failed to update execution record: %w", err)
+		}
 
-	// 5. 持久化
-	return s.instanceRepo.Update(ctx, inst)
+		// 根据节点类型分派处理逻辑
+		node := rg.Nodes[exec.NodeID]
+		handler, ok := s.nodeHandlers[node.Type]
+		if !ok {
+			return fmt.Errorf("unknown node type: %s", node.Type)
+		}
+		return handler(ctx, node, exec)
+	})
 }

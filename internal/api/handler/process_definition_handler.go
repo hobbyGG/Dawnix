@@ -56,7 +56,7 @@ func (h *ProcessDefinitionHandler) Create(c *gin.Context) {
 func (h *ProcessDefinitionHandler) List(c *gin.Context) {
 	// 处理获取流程模板列表的请求
 	req := new(request.ProcessDefinitionListReq)
-	if err := c.ShouldBindQuery(req); err != nil {
+	if err := c.ShouldBind(req); err != nil {
 		h.logger.Error("failed to bind ProcessDefinitionListReq", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -69,7 +69,11 @@ func (h *ProcessDefinitionHandler) List(c *gin.Context) {
 		return
 	}
 	// 对响应进行封装
-	c.JSON(http.StatusOK, pdList)
+	resp := &request.ProcessDefinitionListResp{
+		Total: int64(len(pdList)),
+		List:  pdList,
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *ProcessDefinitionHandler) Detail(c *gin.Context) {

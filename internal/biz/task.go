@@ -23,6 +23,10 @@ type TaskQueryRepo interface {
 	ListWithFilter(ctx context.Context, params *ListTasksParams) ([]*model.TaskView, int64, error)
 }
 
+type TaskScheduler interface {
+	CompleteTask(ctx context.Context, task *model.ProcessTask) error
+}
+
 type ListTasksParams struct {
 	Page      int
 	Size      int

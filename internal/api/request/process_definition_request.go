@@ -82,8 +82,13 @@ func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateP
 }
 
 type ProcessDefinitionListReq struct {
-	Page int `form:"page" binding:"omitempty,min=1"`         // 页码
-	Size int `form:"size" binding:"omitempty,min=1,max=100"` // 每页数量
+	Page int `form:"page" binding:"required,omitempty,min=1"`        // 页码
+	Size int `form:"size" binding:"required,omitempty,min=1,max=50"` // 每页数量
+}
+
+type ProcessDefinitionListResp struct {
+	Total int64                     `json:"total"` // 总记录数
+	List  []model.ProcessDefinition `json:"list"`  // 流程模板列表
 }
 
 func (r *ProcessDefinitionListReq) ToBizParams() *biz.ProcessDefinitionListParams {

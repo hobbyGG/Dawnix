@@ -41,6 +41,23 @@ func (repo *InstanceRepo) GetByID(ctx context.Context, id int64) (*model.Process
 	}
 	return &instance, nil
 }
+
+func (repo *InstanceRepo) GetWithExecutionsByID(ctx context.Context, id int64) (*model.ProcessInstance, []model.Execution, error) {
+	query := repo.db.DB(ctx).WithContext(ctx).Model(&model.ProcessInstance{})
+	var instance model.ProcessInstance
+	query = query.Where("id = ?", id).First(&instance)
+	if query.Error != nil {
+		return nil, nil, query.Error
+	}
+
+	var executions []model.Execution
+	if err := repo.db.DB(ctx).WithContext(ctx).Model(&model.Execution{}).Where("inst_id = ? and is_active = ?", id, true).Find(&executions).Error; err != nil {
+		return nil, nil, err
+	}
+
+	return &instance, executions, nil
+}
+
 func (repo *InstanceRepo) Delete(ctx context.Context, id int64) error {
 	res := repo.db.DB(ctx).WithContext(ctx).Delete(&model.ProcessInstance{}, id)
 	return res.Error
@@ -48,6 +65,13 @@ func (repo *InstanceRepo) Delete(ctx context.Context, id int64) error {
 
 func (repo *InstanceRepo) Update(ctx context.Context, model *model.ProcessInstance) error {
 	if err := repo.db.DB(ctx).WithContext(ctx).Save(model).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+func (repo *InstanceRepo) UpdateStatus(ctx context.Context, id int64, status string) error {
+	if err := repo.db.DB(ctx).WithContext(ctx).Model(&model.ProcessInstance{}).Where("id = ?", id).Update("status", status).Error; err != nil {
 		return err
 	}
 	return nil

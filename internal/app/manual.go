@@ -36,6 +36,7 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 		&model.ProcessDefinition{},
 		&model.ProcessTask{},
 		&model.ProcessInstance{},
+		&model.Execution{},
 	)
 
 	dataObj, cleanup, err := data.NewData(db)
@@ -47,12 +48,10 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 	helloRepo := data.NewHelloRepo(logger)
 	processDefinitionRepo := data.NewProcessDefinitionRepo(dataObj)
 	instanceRepo := data.NewInstanceRepo(dataObj)
+	executionRepo := data.NewExecutionRepo(dataObj)
 	TaskCmdRepo := data.NewCommandTaskRepo(dataObj)
 	TaskQueryRepo := data.NewQueryTaskRepo(dataObj)
 
-	// executor注入
-	executor := make(map[string]biz.NodeBehaviour)
-	executor[model.NodeTypeUserTask] = biz.NewUserNodeBehaviour(TaskCmdRepo)
 	navigator := biz.NewNavigator()
 	// 更多executor的注入......
 	// scheduler初始化
@@ -61,9 +60,9 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 		TxManager:      txManager,
 		DefinitionRepo: processDefinitionRepo,
 		InstanceRepo:   instanceRepo,
+		ExecutionRepo:  executionRepo,
 		TaskCmdRepo:    TaskCmdRepo,
 		Navigator:      navigator,
-		NodeExecutor:   executor,
 	})
 
 	helloSvc := service.NewHelloService(helloRepo, logger)

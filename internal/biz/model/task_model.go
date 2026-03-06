@@ -51,25 +51,20 @@ type ProcessTask struct {
 
 	InstanceID int64 `gorm:"index;not null" json:"instance_id"`
 
-	// 节点ID (对应 JSON 图里的 id)
-	NodeID string `gorm:"type:varchar(64);not null" json:"node_id"`
+	// 执行流ID
+	ExecutionID int64 `gorm:"index" json:"execution_id"`
 
 	// 任务类型
 	Type string `gorm:"type:varchar(32);default:'user_task'" json:"type"`
 
 	// 处理人标识
-	// "user:1001", "role:manager", "sys:http"
 	Assignee string `gorm:"type:varchar(64);index" json:"assignee"`
 
 	Candidates datatypes.JSON `gorm:"type:jsonb" json:"candidates"`
 
-	// 【核心修改】任务状态
-	// 使用上述 TaskStatus* 常量
 	Status string `gorm:"type:varchar(32);default:'PENDING';index" json:"status"`
 
 	// 具体的按钮动作 (辅助字段)
-	// 虽然 Status 已经是结果了，但 Action 用于记录用户点击了哪个按钮
-	// 例如 Status=APPROVED, Action 可能为 "agree" 或 "fast_pass"(一键通过)
 	Action string `gorm:"type:varchar(32)" json:"action"`
 
 	// 审批意见 / 备注
@@ -94,7 +89,6 @@ func (ProcessTask) TableName() string {
 func NewTask(inst *ProcessInstance, nodeID, taskType string) *ProcessTask {
 	return &ProcessTask{
 		InstanceID: inst.ID,
-		NodeID:     nodeID,
 		Type:       taskType,
 		Status:     TaskStatusPending,
 	}

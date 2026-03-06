@@ -39,12 +39,20 @@ func (s *InstanceService) ListInstances(ctx context.Context, params *biz.ListIns
 	return instances, nil
 }
 
-func (s *InstanceService) GetInstanceDetail(ctx context.Context, id int64) (*model.ProcessInstance, error) {
-	instance, err := s.instanceRepo.GetByID(ctx, id)
+func (s *InstanceService) GetInstanceDetail(ctx context.Context, id int64) (*InstanceDetail, error) {
+
+	instance, executions, err := s.instanceRepo.GetWithExecutionsByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get instance by id failed: %w", err)
 	}
-	return instance, nil
+
+	// 拼装返回信息
+	detail := &InstanceDetail{
+		Inst:       instance,
+		Executions: executions,
+	}
+
+	return detail, nil
 }
 
 func (s *InstanceService) DeleteInstance(ctx context.Context, id int64) error {

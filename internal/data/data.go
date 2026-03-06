@@ -12,13 +12,13 @@ type Cache interface {
 }
 
 type Data struct {
-	db    *gorm.DB
+	sqlDB *gorm.DB
 	cache Cache
 }
 
 func NewData(db *gorm.DB) (*Data, func(), error) {
 	d := &Data{
-		db: db,
+		sqlDB: db,
 	}
 
 	cleanup := func() {
@@ -35,7 +35,7 @@ func (d *Data) DB(ctx context.Context) *gorm.DB {
 	if ok {
 		return tx
 	}
-	return d.db
+	return d.sqlDB
 }
 
 type transactionManager struct {

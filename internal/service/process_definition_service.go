@@ -36,7 +36,7 @@ func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, pa
 	return id, nil
 }
 
-func (s *ProcessDefinitionService) ListProcessDefinitions(ctx context.Context, params *biz.ProcessDefinitionListParams) ([]*model.ProcessDefinition, error) {
+func (s *ProcessDefinitionService) ListProcessDefinitions(ctx context.Context, params *biz.ProcessDefinitionListParams) ([]model.ProcessDefinition, error) {
 	// 这里实现获取流程模板列表的业务逻辑
 	// 业务校验：分页参数是否合法
 	pdList, err := s.repo.List(ctx, params)

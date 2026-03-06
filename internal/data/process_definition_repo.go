@@ -32,13 +32,13 @@ func (repo *ProcessDefinitionRepo) Create(ctx context.Context, model *model.Proc
 	return model.ID, nil
 }
 
-func (repo *ProcessDefinitionRepo) List(ctx context.Context, params *biz.ProcessDefinitionListParams) ([]*model.ProcessDefinition, error) {
+func (repo *ProcessDefinitionRepo) List(ctx context.Context, params *biz.ProcessDefinitionListParams) ([]model.ProcessDefinition, error) {
 	// 这里实现获取流程模板列表的数据库操作
 	if params == nil {
 		return nil, nil
 	}
 
-	var pdList []*model.ProcessDefinition
+	var pdList []model.ProcessDefinition
 	query := repo.db.DB(ctx).WithContext(ctx).Model(&model.ProcessDefinition{})
 
 	res := query.Offset(params.Page - 1).Limit(params.Size).Find(&pdList)
