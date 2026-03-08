@@ -43,32 +43,3 @@ func NewSchedulerRuntimeGraph(graphModel *model.GraphModel) *RuntimeGraph {
 	}
 	return schedulerGraph
 }
-
-type tokenQueue struct {
-	nodes []string
-}
-
-func (q *tokenQueue) Enqueue(nodeID string) {
-	q.nodes = append(q.nodes, nodeID)
-}
-
-func (q *tokenQueue) Dequeue() (string, bool) {
-	if len(q.nodes) == 0 {
-		return "", false
-	}
-	res := q.nodes[0]
-	q.nodes[0] = "" // 显式置空，防止内存泄漏
-	q.nodes = q.nodes[1:]
-	return res, true
-}
-
-func (q *tokenQueue) IsEmpty() bool {
-	return len(q.nodes) == 0
-}
-
-func (q *tokenQueue) Peek() (string, bool) {
-	if len(q.nodes) == 0 {
-		return "", false
-	}
-	return q.nodes[0], true
-}

@@ -2,8 +2,6 @@ package model
 
 import (
 	"time"
-
-	"gorm.io/datatypes"
 )
 
 // 状态定义 (完全对齐飞书 Open API)
@@ -49,58 +47,41 @@ const (
 type ProcessTask struct {
 	BaseModel
 
-	InstanceID int64 `gorm:"index;not null" json:"instance_id"`
+	InstanceID int64 `gorm:"index;not null"`
 
 	// 执行流ID
-	ExecutionID int64 `gorm:"index" json:"execution_id"`
+	ExecutionID int64 `gorm:"index"`
+
+	NodeID string `gorm:"type:varchar(64);index"`
 
 	// 任务类型
-	Type string `gorm:"type:varchar(32);default:'user_task'" json:"type"`
+	Type string `gorm:"type:varchar(32);default:'user_task'"`
 
 	// 处理人标识
-	Assignee string `gorm:"type:varchar(64);index" json:"assignee"`
+	Assignee string `gorm:"type:varchar(64);index"`
 
-	Candidates datatypes.JSON `gorm:"type:jsonb" json:"candidates"`
+	Candidates []string `gorm:"type:json"`
 
-	Status string `gorm:"type:varchar(32);default:'PENDING';index" json:"status"`
+	Status string `gorm:"type:varchar(32);default:'PENDING';index"`
 
 	// 具体的按钮动作 (辅助字段)
-	Action string `gorm:"type:varchar(32)" json:"action"`
+	Action string `gorm:"type:varchar(32)"`
 
 	// 审批意见 / 备注
-	Comment string `gorm:"type:text" json:"comment"`
-
-	// 任务局部变量 (快照)
-	Variables datatypes.JSON `gorm:"type:jsonb" json:"variables"`
-
-	// 超时与重试
-	RetryCount int        `gorm:"default:0" json:"retry_count"`
-	ExpireAt   *time.Time `gorm:"index" json:"expire_at"`
-
-	CostTime   int64      `json:"cost_time"`
-	FinishedAt *time.Time `json:"finished_at"`
+	Comment string `gorm:"type:text"`
 }
 
 func (ProcessTask) TableName() string {
 	return "process_tasks"
 }
 
-// NewTask 创建一个新的 ProcessTask 实例
-func NewTask(inst *ProcessInstance, nodeID, taskType string) *ProcessTask {
-	return &ProcessTask{
-		InstanceID: inst.ID,
-		Type:       taskType,
-		Status:     TaskStatusPending,
-	}
-}
-
 // TaskView 这是你的【查询结果】，用于 CQRS 的读操作
 // 它不是一张表，它是多张表 Join 后的"投影"
 type TaskView struct {
-	ID            int64     `json:"id"`
-	TaskName      string    `json:"task_name"`
-	Status        string    `json:"status"`
-	ProcessTitle  string    `json:"process_title"`  // 来自 definition 表
-	SubmitterName string    `json:"submitter_name"` // 来自 instance 表
-	ArrivedAt     time.Time `json:"arrived_at"`
+	ID            int64
+	TaskName      string
+	Status        string
+	ProcessTitle  string // 来自 definition 表
+	SubmitterName string // 来自 instance 表
+	ArrivedAt     time.Time
 }

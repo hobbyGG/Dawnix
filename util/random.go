@@ -81,9 +81,8 @@ func RandomProcessTask(instanceID, executionID int64, nodeID string) *model.Proc
 		ExecutionID: executionID,
 		Type:        model.TaskTypeUser,
 		Assignee:    RandomString("assignee"),
-		Candidates:  datatypes.JSON([]byte(`{"users":[]}`)),
+		Candidates:  []string{RandomString("user")},
 		Status:      model.TaskStatusPending,
-		Variables:   datatypes.JSON([]byte("{}")),
 	}
 }
 

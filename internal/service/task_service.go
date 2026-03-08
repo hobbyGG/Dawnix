@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/hobbyGG/Dawnix/internal/biz"
 	"github.com/hobbyGG/Dawnix/internal/biz/model"
@@ -60,8 +59,6 @@ func (s *TaskService) CompleteTask(ctx context.Context, params *biz.CompleteTask
 	// 业务处理
 	task.Status = model.TaskStatusApproved
 	task.Comment = params.Comment // 保存审批意见
-	now := time.Now()
-	task.FinishedAt = &now
 
 	// 3. 通知调度器完成任务
 	if err := s.scheduler.CompleteTask(ctx, task); err != nil {

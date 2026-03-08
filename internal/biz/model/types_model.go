@@ -2,19 +2,13 @@ package model
 
 // 节点类型
 const (
-	// 基础控制
 	NodeTypeStart    = "start"
 	NodeTypeEnd      = "end"
-	NodeTypeGateway  = "gateway"
 	NodeTypeUserTask = "user_task"
 
-	// 自动化节点
-	NodeTypeAITask   = "ai_task"
-	NodeTypeRuleTask = "rule_task"
-
-	// 事件节点
-	NodeTypeServiceTask = "service_task" // 主动投递 (HTTP/Internal)
-	NodeTypeReceiveTask = "receive_task" // 被动等待 (Webhook回调)
+	NodeTypeForkGateway = "fork_gateway"
+	NodeTypeJoinGateway = "join_gateway"
+	NodeTypeXORGateway  = "xor_gateway"
 )
 
 // 数据库中的流程图结构
@@ -28,10 +22,6 @@ type NodeModel struct {
 	Type       string     `json:"type"`                 // 节点类型
 	Name       string     `json:"name"`                 // 节点展示的名称
 	Candidates Candidates `json:"candidates,omitempty"` // 候选人，仅用户任务节点有效
-}
-
-func (n *NodeModel) IsAutoType() bool {
-	return n.Type == NodeTypeAITask || n.Type == NodeTypeRuleTask || n.Type == NodeTypeServiceTask
 }
 
 type EdgeModel struct {
