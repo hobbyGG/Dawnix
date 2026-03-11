@@ -1,5 +1,14 @@
+# 敏感文件
 .env
-.exe
-.log
-.idea
-.vscode
+.env.local
+local.env
+
+# 编译产物
+*.exe
+
+# IDE 配置
+.idea/
+.vscode/
+
+# 日志和临时文件
+*.log
