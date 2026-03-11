@@ -25,6 +25,7 @@ func NewSchedulerRuntimeGraph(graphModel *model.GraphModel) *RuntimeGraph {
 			Type:       nodeModel.Type,
 			Name:       nodeModel.Name,
 			Candidates: nodeModel.Candidates,
+			Properties: nodeModel.Properties,
 		}
 		schedulerGraph.Nodes[node.ID] = node
 		if node.Type == model.NodeTypeStart {

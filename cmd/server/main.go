@@ -1,19 +1,64 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"os"
 	"strings"
 
+	"github.com/hobbyGG/Dawnix/client"
 	"github.com/hobbyGG/Dawnix/internal/app"
+	"github.com/hobbyGG/Dawnix/internal/biz"
+	"github.com/hobbyGG/Dawnix/worker"
+	"github.com/redis/go-redis/v9"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
 )
 
 func main() {
+	// 加载配置文件
+	viper.SetConfigName("local")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("..")
+	viper.AddConfigPath("../..")
+	viper.SetConfigType("env")
+	viper.AutomaticEnv()
+	if err := viper.ReadInConfig(); err != nil {
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) {
+			panic(err)
+		}
+	}
+	smtpToken := viper.GetString("SMTP_TOKEN")
+	if smtpToken == "" {
+		panic("SMTP_TOKEN not found in config")
+	}
+
 	// zap日志库初始化
 	logger := NewLogger()
 	defer logger.Sync()
+
+	// 启动 worker
+	workerConfig := &workerConfig{
+		SMTPToken: smtpToken,
+		Email:     viper.GetString("SMTP_EMAIL"),
+		RedisAddr: viper.GetString("REDIS_ADDR"),
+	}
+	if workerConfig.Email == "" {
+		workerConfig.Email = "1056652209@qq.com"
+	}
+	if workerConfig.RedisAddr == "" {
+		workerConfig.RedisAddr = "127.0.0.1:16379"
+	}
+
+	eSendWorker, err := InitWorker(workerConfig)
+	if err != nil {
+		panic(err)
+	}
+	defer eSendWorker.Stop()
 
 	// 创建并运行应用程序
 	app, err := app.NewAppManual(logger)
@@ -27,6 +72,29 @@ func main() {
 	}()
 
 	app.Run()
+}
+
+type workerConfig struct {
+	SMTPToken string
+	Email     string
+	RedisAddr string
+}
+
+func InitWorker(c *workerConfig) (*worker.EmailSendWorker, error) {
+	redisOpts := &redis.Options{
+		Addr: c.RedisAddr,
+	}
+	rdb := redis.NewClient(redisOpts)
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		return nil, fmt.Errorf("init worker redis failed: %w", err)
+	}
+
+	ecli := client.NewEmailClient(c.SMTPToken, c.Email)
+	mq := biz.NewRedisMQ(rdb)
+	eSendWorker := worker.NewEmailSender(ecli, mq)
+	go eSendWorker.Start(context.Background())
+
+	return eSendWorker, nil
 }
 
 func NewLogger() *zap.Logger {

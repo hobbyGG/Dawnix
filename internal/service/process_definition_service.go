@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/hobbyGG/Dawnix/internal/biz"
@@ -24,6 +25,16 @@ func NewProcessDefinitionService(repo biz.ProcessDefinitionRepo, logger *zap.Log
 func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, params *biz.ProcessDefinitionCreateParams) (int64, error) {
 	// 这里实现创建流程模板的业务逻辑
 	// 业务校验：流程是否已经存在，唯一字段是否存在冲突
+
+	for _, node := range params.Structure.Nodes {
+		if node.Type == model.NodeTypeEmailService {
+			// 验证参数
+			var emailParams model.EmailNodeParmas
+			if err := json.Unmarshal(node.Properties, &emailParams); err != nil {
+				return 0, fmt.Errorf("fail to unmarshal email service properties: %w", err)
+			}
+		}
+	}
 
 	model, err := paramsToProcessDef(params)
 	if err != nil {

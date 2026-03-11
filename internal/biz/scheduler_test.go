@@ -69,14 +69,14 @@ func setupSchedulerTestEnv(t *testing.T) *schedulerTestEnv {
 	executionRepo := data.NewExecutionRepo(dataObj)
 	taskRepo := data.NewCommandTaskRepo(dataObj)
 
-	scheduler := biz.NewScheduler(&biz.SchedulerDependencies{
-		TxManager:      data.NewTransactionManager(db),
-		DefinitionRepo: definitionRepo,
-		InstanceRepo:   instanceRepo,
-		ExecutionRepo:  executionRepo,
-		TaskCmdRepo:    taskRepo,
-		Navigator:      biz.NewNavigator(),
-	})
+	scheduler := biz.NewScheduler(
+		data.NewTransactionManager(db),
+		definitionRepo,
+		instanceRepo,
+		executionRepo,
+		taskRepo,
+		nil,
+	)
 
 	return &schedulerTestEnv{
 		db:           db,

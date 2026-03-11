@@ -15,36 +15,37 @@ type Scheduler struct {
 	instanceRepo   InstanceRepo
 	executionRepo  ExecutionRepo
 	taskCmdRepo    TaskCommandRepo
-	navigator      *Navigator
 	nodeHandlers   map[string]NodeHandlerFunc // nodeType -> 到达该节点时的处理逻辑
+	srvTaskMQ      ServiceTaskMQ
 }
 
-type SchedulerDependencies struct {
-	TxManager      TransactionManager
-	DefinitionRepo ProcessDefinitionRepo
-	InstanceRepo   InstanceRepo
-	ExecutionRepo  ExecutionRepo
-	TaskCmdRepo    TaskCommandRepo
-	Navigator      *Navigator
-}
-
-func NewScheduler(dependencies *SchedulerDependencies) *Scheduler {
+func NewScheduler(
+	TxManager TransactionManager,
+	DefinitionRepo ProcessDefinitionRepo,
+	InstanceRepo InstanceRepo,
+	ExecutionRepo ExecutionRepo,
+	TaskCmdRepo TaskCommandRepo,
+	ServiceTaskMQ ServiceTaskMQ,
+) *Scheduler {
+	if TxManager == nil || DefinitionRepo == nil || InstanceRepo == nil || ExecutionRepo == nil || TaskCmdRepo == nil {
+		panic("missing dependencies for Scheduler")
+	}
 	nh := &nodeHandlers{
-		taskCmdRepo:   dependencies.TaskCmdRepo,
-		executionRepo: dependencies.ExecutionRepo,
-		instanceRepo:  dependencies.InstanceRepo,
+		taskCmdRepo:   TaskCmdRepo,
+		executionRepo: ExecutionRepo,
+		instanceRepo:  InstanceRepo,
 	}
 	return &Scheduler{
-		txManager:      dependencies.TxManager,
-		definitionRepo: dependencies.DefinitionRepo,
-		instanceRepo:   dependencies.InstanceRepo,
-		executionRepo:  dependencies.ExecutionRepo,
-		taskCmdRepo:    dependencies.TaskCmdRepo,
-		navigator:      dependencies.Navigator,
+		txManager:      TxManager,
+		definitionRepo: DefinitionRepo,
+		instanceRepo:   InstanceRepo,
+		executionRepo:  ExecutionRepo,
+		taskCmdRepo:    TaskCmdRepo,
 		nodeHandlers: map[string]NodeHandlerFunc{
 			model.NodeTypeUserTask: nh.userTask,
 			model.NodeTypeEnd:      nh.endNode,
 		},
+		srvTaskMQ: ServiceTaskMQ,
 	}
 }
 
@@ -159,6 +160,10 @@ func (s *Scheduler) moveToken(ctx context.Context, executionID int64, nextNodeID
 		if err := s.nodeHandlerEndNode(ctx, exec); err != nil {
 			return fmt.Errorf("failed to handle end node: %w", err)
 		}
+	case model.NodeTypeEmailService:
+		if err := s.nodeHandlerEmailService(ctx, exec, rg); err != nil {
+			return fmt.Errorf("failed to handle email service node: %w", err)
+		}
 	case model.NodeTypeForkGateway:
 		return s.gatewayHandlerFork(ctx, exec, rg)
 	case model.NodeTypeJoinGateway:
@@ -195,6 +200,23 @@ func (s *Scheduler) nodeHandlerEndNode(ctx context.Context, exec *model.Executio
 		return err
 	}
 
+	return nil
+}
+
+func (s *Scheduler) nodeHandlerEmailService(ctx context.Context, exec *model.Execution, rg *RuntimeGraph) error {
+	if s.srvTaskMQ == nil {
+		return fmt.Errorf("service task mq is not initialized")
+	}
+
+	// 将邮件发送请求放到消息队列中，由独立的邮件服务消费者处理
+	if err := s.srvTaskMQ.ProduceEmailTask(ctx, rg.Nodes[exec.NodeID].Properties); err != nil {
+		return fmt.Errorf("failed to produce email task: %w", err)
+	}
+	// 流转
+	nextNodeID := rg.Next[exec.NodeID][0].TargetNode
+	if err := s.moveToken(ctx, exec.ID, nextNodeID, rg); err != nil {
+		return fmt.Errorf("failed to move token after enqueueing email task: %w", err)
+	}
 	return nil
 }
 

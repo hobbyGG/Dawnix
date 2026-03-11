@@ -1,6 +1,8 @@
 package request
 
 import (
+	"encoding/json"
+
 	"github.com/hobbyGG/Dawnix/internal/biz"
 	"github.com/hobbyGG/Dawnix/internal/biz/model"
 )
@@ -29,6 +31,8 @@ type ProcessNode struct {
 	Type       string           `json:"type"`                 // 节点类型
 	Name       string           `json:"name"`                 // 节点展示的名称
 	Candidates model.Candidates `json:"candidates,omitempty"` // 候选人，仅用户任务节点有效
+
+	Properties json.RawMessage `json:"properties,omitempty"` // 其他属性，针对不同类型节点的特有属性，例如邮件服务节点的邮件参数等
 }
 
 type ProcessEdge struct {
@@ -62,6 +66,7 @@ func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateP
 			Type:       node.Type,
 			Name:       node.Name,
 			Candidates: node.Candidates,
+			Properties: node.Properties,
 		}
 		graph.Nodes = append(graph.Nodes, workflowNode)
 	}

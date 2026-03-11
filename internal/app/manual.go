@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/hobbyGG/Dawnix/internal/biz/model"
 	"github.com/hobbyGG/Dawnix/internal/data"
 	"github.com/hobbyGG/Dawnix/internal/service"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -39,6 +41,15 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 		&model.Execution{},
 	)
 
+	// rdb 初始化
+	redOpts := &redis.Options{
+		Addr: "127.0.0.1:16379",
+	}
+	rdb := redis.NewClient(redOpts)
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		return nil, fmt.Errorf("fail to initialize redis: %w", err)
+	}
+
 	dataObj, cleanup, err := data.NewData(db)
 	if err != nil {
 		return nil, fmt.Errorf("fail to initialize data layer: %w", err)
@@ -52,18 +63,19 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 	TaskCmdRepo := data.NewCommandTaskRepo(dataObj)
 	TaskQueryRepo := data.NewQueryTaskRepo(dataObj)
 
-	navigator := biz.NewNavigator()
-	// 更多executor的注入......
+	// MQ 初始化
+	mq := biz.NewRedisMQ(rdb)
+
 	// scheduler初始化
 	txManager := data.NewTransactionManager(db)
-	scheduler := biz.NewScheduler(&biz.SchedulerDependencies{
-		TxManager:      txManager,
-		DefinitionRepo: processDefinitionRepo,
-		InstanceRepo:   instanceRepo,
-		ExecutionRepo:  executionRepo,
-		TaskCmdRepo:    TaskCmdRepo,
-		Navigator:      navigator,
-	})
+	scheduler := biz.NewScheduler(
+		txManager,
+		processDefinitionRepo,
+		instanceRepo,
+		executionRepo,
+		TaskCmdRepo,
+		biz.NewServiceTaskMQImpl(mq),
+	)
 
 	helloSvc := service.NewHelloService(helloRepo, logger)
 	helloHandler := handler.NewHelloHandler(helloSvc, logger)
