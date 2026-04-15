@@ -1,4 +1,4 @@
-package app
+package main
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
-	"github.com/hobbyGG/Dawnix/internal/api"
-	"github.com/hobbyGG/Dawnix/internal/api/handler"
+	"github.com/gin-gonic/gin"
+	"github.com/hobbyGG/Dawnix/api"
 	"github.com/hobbyGG/Dawnix/internal/biz"
 	"github.com/hobbyGG/Dawnix/internal/biz/model"
 	"github.com/hobbyGG/Dawnix/internal/data"
@@ -18,6 +18,16 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
+
+type App struct {
+	Server  *gin.Engine
+	Cleanup func()
+}
+
+func (a *App) Run() error {
+	// 默认8080端口
+	return a.Server.Run(":8080")
+}
 
 func NewAppManual(logger *zap.Logger) (*App, error) {
 	// 数据库初始化化
@@ -56,12 +66,11 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 	}
 
 	// data注入repo
-	helloRepo := data.NewHelloRepo(logger)
 	processDefinitionRepo := data.NewProcessDefinitionRepo(dataObj)
 	instanceRepo := data.NewInstanceRepo(dataObj)
 	executionRepo := data.NewExecutionRepo(dataObj)
-	TaskCmdRepo := data.NewCommandTaskRepo(dataObj)
-	TaskQueryRepo := data.NewQueryTaskRepo(dataObj)
+	taskCmdRepo := data.NewCommandTaskRepo(dataObj)
+	taskQueryRepo := data.NewQueryTaskRepo(dataObj)
 
 	// MQ 初始化
 	mq := biz.NewRedisMQ(rdb)
@@ -73,23 +82,20 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 		processDefinitionRepo,
 		instanceRepo,
 		executionRepo,
-		TaskCmdRepo,
+		taskCmdRepo,
 		biz.NewServiceTaskMQImpl(mq),
 	)
 
-	helloSvc := service.NewHelloService(helloRepo, logger)
-	helloHandler := handler.NewHelloHandler(helloSvc, logger)
-
-	processDefinisionSvc := service.NewProcessDefinitionService(processDefinitionRepo, logger)
-	processDefinitionHandler := handler.NewProcessDefinitionHandler(processDefinisionSvc, logger)
+	processDefinitionSvc := service.NewProcessDefinitionService(processDefinitionRepo, logger)
+	processDefinitionHandler := api.NewProcessDefinitionHandler(processDefinitionSvc, logger)
 
 	instanceSvc := service.NewInstanceService(instanceRepo, scheduler, logger)
-	instanceHandler := handler.NewInstanceHandler(instanceSvc, logger)
+	instanceHandler := api.NewInstanceHandler(instanceSvc, logger)
 
-	taskSvc := service.NewTaskService(TaskCmdRepo, TaskQueryRepo, scheduler, logger)
-	taskHandler := handler.NewTaskHandler(taskSvc, logger)
+	taskSvc := service.NewTaskService(taskCmdRepo, taskQueryRepo, scheduler, logger)
+	taskHandler := api.NewTaskHandler(taskSvc, logger)
 
-	r := api.NewRouter(helloHandler, processDefinitionHandler, instanceHandler, taskHandler)
+	r := api.NewRouter(processDefinitionHandler, instanceHandler, taskHandler)
 
 	// 允许跨域中间件配置
 	config := cors.DefaultConfig()

@@ -1,10 +1,10 @@
-package handler
+package api
 
 import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hobbyGG/Dawnix/internal/api/request"
+	"github.com/hobbyGG/Dawnix/internal/biz"
 	"github.com/hobbyGG/Dawnix/internal/service"
 	"go.uber.org/zap"
 )
@@ -29,7 +29,7 @@ func (h *InstanceHandler) Register(rg *gin.RouterGroup) {
 
 func (h *InstanceHandler) Create(c *gin.Context) {
 	// 处理创建实例的请求
-	req := new(request.CreateInstanceReq)
+	req := new(CreateInstanceReq)
 	if err := c.ShouldBindJSON(req); err != nil {
 		h.logger.Error("failed to bind CreateInstanceReq", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -48,7 +48,7 @@ func (h *InstanceHandler) Create(c *gin.Context) {
 
 func (h *InstanceHandler) List(c *gin.Context) {
 	// 处理获取实例列表的请求
-	req := new(request.ListInstancesReq)
+	req := new(ListInstancesReq)
 	if err := c.ShouldBindQuery(req); err != nil {
 		h.logger.Error("failed to bind ListInstancesReq", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -65,7 +65,7 @@ func (h *InstanceHandler) List(c *gin.Context) {
 
 func (h *InstanceHandler) Detail(c *gin.Context) {
 	// 处理获取实例详情的请求
-	req := new(request.GetInstanceDetailReq)
+	req := new(GetInstanceDetailReq)
 	if err := c.ShouldBindUri(req); err != nil {
 		h.logger.Error("failed to bind GetInstanceDetailReq", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -82,7 +82,7 @@ func (h *InstanceHandler) Detail(c *gin.Context) {
 
 func (h *InstanceHandler) Delete(c *gin.Context) {
 	// 处理删除实例的请求
-	req := new(request.DeleteInstanceReq)
+	req := new(DeleteInstanceReq)
 	if err := c.ShouldBindUri(req); err != nil {
 		h.logger.Error("failed to bind DeleteInstanceReq", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -94,4 +94,50 @@ func (h *InstanceHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "deleted success"})
+}
+
+type CreateInstanceReq struct {
+	// 流程标识 (必填)
+	// 前端只传 Code，后端负责查 Definition 表找最新版
+	ProcessCode string `json:"process_code" binding:"required"`
+
+	// 发起人 ID (必填)
+	SubmitterID string `json:"submitter_id" binding:"required"`
+
+	// 业务表单数据 (可选)
+	Variables map[string]interface{} `json:"variables"`
+
+	// 父流程相关 (可选，用于子流程场景)
+	ParentID     int64  `json:"parent_id"`
+	ParentNodeID string `json:"parent_node_id"`
+}
+
+func (r *CreateInstanceReq) ToBizCmd() *biz.StartProcessInstanceCmd {
+	return &biz.StartProcessInstanceCmd{
+		ProcessCode:  r.ProcessCode,
+		SubmitterID:  r.SubmitterID,
+		Variables:    r.Variables,
+		ParentID:     r.ParentID,
+		ParentNodeID: r.ParentNodeID,
+	}
+}
+
+type ListInstancesReq struct {
+	Page int `form:"page" binding:"omitempty,min=1"`
+	Size int `form:"size" binding:"omitempty,min=1,max=100"`
+}
+
+func (r *ListInstancesReq) ToBizParams() *biz.ListInstancesParams {
+	return &biz.ListInstancesParams{
+		Page: r.Page,
+		Size: r.Size,
+	}
+}
+
+type GetInstanceDetailReq struct {
+	ID int64 `uri:"id" binding:"required"`
+}
+
+type DeleteInstanceReq struct {
+	ID int64 `uri:"id" binding:"required,min=1"`
 }

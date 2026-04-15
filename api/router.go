@@ -1,8 +1,6 @@
 package api
 
-import (
-	"github.com/gin-gonic/gin"
-)
+import "github.com/gin-gonic/gin"
 
 type RouterRegistrar interface {
 	// 定义路由接口方法

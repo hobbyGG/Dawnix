@@ -1,11 +1,11 @@
-package handler
+package api
 
 import (
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hobbyGG/Dawnix/internal/api/request"
+	"github.com/hobbyGG/Dawnix/internal/biz"
 	"github.com/hobbyGG/Dawnix/internal/service"
 	"go.uber.org/zap"
 )
@@ -29,7 +29,7 @@ func (h *TaskHandler) Register(rg *gin.RouterGroup) {
 
 func (h *TaskHandler) Detail(c *gin.Context) {
 	// 处理获取任务详情的请求
-	req := new(request.GetTaskDetailReq)
+	req := new(GetTaskDetailReq)
 	if err := c.ShouldBindUri(req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -45,7 +45,7 @@ func (h *TaskHandler) Detail(c *gin.Context) {
 
 func (h *TaskHandler) List(c *gin.Context) {
 	// 处理获取任务列表的请求
-	req := new(request.ListTasksReq)
+	req := new(ListTasksReq)
 	if err := c.ShouldBindQuery(req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -57,10 +57,10 @@ func (h *TaskHandler) List(c *gin.Context) {
 	if req.Size == 0 {
 		req.Size = 10
 	}
-	ListTasksParams := req.ToBizParams()
-	ListTasksParams.UserID = "umep123" // TODO: 从中间件获取当前用户ID
+	listTasksParams := req.ToBizParams()
+	listTasksParams.UserID = "umep123" // TODO: 从中间件获取当前用户ID
 
-	taskListView, total, err := h.svc.ListTasksView(c.Request.Context(), ListTasksParams)
+	taskListView, total, err := h.svc.ListTasksView(c.Request.Context(), listTasksParams)
 	if err != nil {
 		h.logger.Error("failed to list tasks", zap.Error(err))
 		c.JSON(http.StatusOK, gin.H{"error": err.Error()})
@@ -71,7 +71,7 @@ func (h *TaskHandler) List(c *gin.Context) {
 
 func (h *TaskHandler) Complete(c *gin.Context) {
 	// 处理完成任务的请求
-	req := new(request.CompleteTaskReq)
+	req := new(CompleteTaskReq)
 	if idStr, exist := c.Params.Get("id"); exist {
 		var err error
 		req.ID, err = strconv.ParseInt(idStr, 10, 64)
@@ -91,4 +91,49 @@ func (h *TaskHandler) Complete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success"})
+}
+
+type GetTaskDetailReq struct {
+	ID int64 `uri:"id" binding:"required"`
+}
+
+type ListTasksReq struct {
+	// 分页参数
+	Page  int    `form:"page" binding:"omitempty,min=1"`
+	Size  int    `form:"size" binding:"omitempty,min=1,max=100"`
+	Scope string `form:"scope" binding:"omitempty"` // 列表页范围：my_pending, my_completed, all_pending, all_completed...
+}
+
+func (req *ListTasksReq) ToBizParams() *biz.ListTasksParams {
+	return &biz.ListTasksParams{
+		Page:  req.Page,
+		Size:  req.Size,
+		Scope: req.Scope,
+	}
+}
+
+type CompleteTaskReq struct {
+	// 任务 ID (路径参数)
+	ID int64 `uri:"id"`
+
+	// 动作: "agree", "reject", "transfer"
+	Action string `json:"action" binding:"required"`
+
+	// 审批意见
+	Comment string `json:"comment"`
+
+	// 变量: 比如请假表单里的实际数据，或者审批人填写的新字段
+	Variables map[string]interface{} `json:"variables"`
+
+	// 当前操作人 (Middleware 注入)
+	CurrentUserID int64 `json:"-"`
+}
+
+func (req *CompleteTaskReq) ToBizParams() *biz.CompleteTaskParams {
+	return &biz.CompleteTaskParams{
+		TaskID:  req.ID,
+		UserID:  req.CurrentUserID,
+		Action:  req.Action,
+		Comment: req.Comment,
+	}
 }

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/hobbyGG/Dawnix/client"
-	"github.com/hobbyGG/Dawnix/internal/app"
 	"github.com/hobbyGG/Dawnix/internal/biz"
 	"github.com/hobbyGG/Dawnix/worker"
 	"github.com/redis/go-redis/v9"
@@ -61,17 +60,19 @@ func main() {
 	defer eSendWorker.Stop()
 
 	// 创建并运行应用程序
-	app, err := app.NewAppManual(logger)
+	serverApp, err := NewAppManual(logger)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
-		if app.Cleanup != nil {
-			app.Cleanup()
+		if serverApp.Cleanup != nil {
+			serverApp.Cleanup()
 		}
 	}()
 
-	app.Run()
+	if err := serverApp.Run(); err != nil {
+		panic(err)
+	}
 }
 
 type workerConfig struct {
