@@ -3,14 +3,14 @@ package biz
 import (
 	"context"
 
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	"github.com/hobbyGG/Dawnix/internal/domain"
 	"gorm.io/datatypes"
 )
 
 type TaskCommandRepo interface {
-	Create(ctx context.Context, task *model.ProcessTask) error
-	GetByID(ctx context.Context, taskID int64) (*model.ProcessTask, error)
-	Update(ctx context.Context, task *model.ProcessTask) error
+	Create(ctx context.Context, task *domain.ProcessTask) error
+	GetByID(ctx context.Context, taskID int64) (*domain.ProcessTask, error)
+	Update(ctx context.Context, task *domain.ProcessTask) error
 }
 
 // ==========================================
@@ -19,12 +19,12 @@ type TaskCommandRepo interface {
 // 特点: 出参是 Read Model (TaskSummary)
 // ==========================================
 type TaskQueryRepo interface {
-	GetDetailView(ctx context.Context, taskID int64) (*model.TaskView, error)
-	ListWithFilter(ctx context.Context, params *ListTasksParams) ([]*model.TaskView, int64, error)
+	GetDetailView(ctx context.Context, taskID int64) (*domain.TaskView, error)
+	ListWithFilter(ctx context.Context, params *ListTasksParams) ([]*domain.TaskView, int64, error)
 }
 
 type TaskScheduler interface {
-	CompleteTask(ctx context.Context, task *model.ProcessTask) error
+	CompleteTask(ctx context.Context, task *domain.ProcessTask) error
 }
 
 type ListTasksParams struct {

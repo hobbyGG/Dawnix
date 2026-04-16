@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hobbyGG/Dawnix/internal/biz"
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	"github.com/hobbyGG/Dawnix/internal/domain"
 	"github.com/hobbyGG/Dawnix/internal/service"
 	"go.uber.org/zap"
 )
@@ -132,10 +132,10 @@ type ProcessStructure struct {
 }
 
 type ProcessNode struct {
-	ID         string           `json:"id"`                   // 节点ID
-	Type       string           `json:"type"`                 // 节点类型
-	Name       string           `json:"name"`                 // 节点展示的名称
-	Candidates model.Candidates `json:"candidates,omitempty"` // 候选人，仅用户任务节点有效
+	ID         string            `json:"id"`                   // 节点ID
+	Type       string            `json:"type"`                 // 节点类型
+	Name       string            `json:"name"`                 // 节点展示的名称
+	Candidates domain.Candidates `json:"candidates,omitempty"` // 候选人，仅用户任务节点有效
 
 	Properties json.RawMessage `json:"properties,omitempty"` // 其他属性，针对不同类型节点的特有属性，例如邮件服务节点的邮件参数等
 }
@@ -160,13 +160,13 @@ type ProcessConfig struct {
 
 func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateParams {
 	// 这里需要将 ProcessStructure 转换为 graph结构
-	graph := model.GraphModel{
-		Nodes: []model.NodeModel{},
-		Edges: []model.EdgeModel{},
+	graph := domain.GraphModel{
+		Nodes: []domain.NodeModel{},
+		Edges: []domain.EdgeModel{},
 	}
 	// 转换 Nodes
 	for _, node := range r.Structure.Nodes {
-		workflowNode := model.NodeModel{
+		workflowNode := domain.NodeModel{
 			ID:         node.ID,
 			Type:       node.Type,
 			Name:       node.Name,
@@ -177,7 +177,7 @@ func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateP
 	}
 	// 转换 Edges
 	for _, edge := range r.Structure.Edges {
-		workflowEdge := model.EdgeModel{
+		workflowEdge := domain.EdgeModel{
 			ID:         edge.ID,
 			SourceNode: edge.SourceNode,
 			TargetNode: edge.TargetNode,
@@ -197,8 +197,8 @@ type ProcessDefinitionListReq struct {
 }
 
 type ProcessDefinitionListResp struct {
-	Total int64                     `json:"total"` // 总记录数
-	List  []model.ProcessDefinition `json:"list"`  // 流程模板列表
+	Total int64                      `json:"total"` // 总记录数
+	List  []domain.ProcessDefinition `json:"list"`  // 流程模板列表
 }
 
 func (r *ProcessDefinitionListReq) ToBizParams() *biz.ProcessDefinitionListParams {

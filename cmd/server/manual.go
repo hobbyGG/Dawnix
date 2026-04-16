@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hobbyGG/Dawnix/api"
 	"github.com/hobbyGG/Dawnix/internal/biz"
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
 	"github.com/hobbyGG/Dawnix/internal/data"
+	dataModel "github.com/hobbyGG/Dawnix/internal/data/model"
 	"github.com/hobbyGG/Dawnix/internal/service"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -45,10 +45,10 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(30 * time.Minute)
 	db.AutoMigrate(
-		&model.ProcessDefinition{},
-		&model.ProcessTask{},
-		&model.ProcessInstance{},
-		&model.Execution{},
+		&dataModel.ProcessDefinition{},
+		&dataModel.ProcessTask{},
+		&dataModel.ProcessInstance{},
+		&dataModel.Execution{},
 	)
 
 	// rdb 初始化

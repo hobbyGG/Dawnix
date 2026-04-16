@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	"github.com/hobbyGG/Dawnix/internal/domain"
 )
 
 // 核心流程引擎
@@ -42,8 +42,8 @@ func NewScheduler(
 		executionRepo:  ExecutionRepo,
 		taskCmdRepo:    TaskCmdRepo,
 		nodeHandlers: map[string]NodeHandlerFunc{
-			model.NodeTypeUserTask: nh.userTask,
-			model.NodeTypeEnd:      nh.endNode,
+			domain.NodeTypeUserTask: nh.userTask,
+			domain.NodeTypeEnd:      nh.endNode,
 		},
 		srvTaskMQ: ServiceTaskMQ,
 	}
@@ -61,7 +61,7 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd *StartProcessI
 		}
 
 		// 从def中拿到SchedulerGraph
-		var graph model.GraphModel
+		var graph domain.GraphModel
 		if err := json.Unmarshal(processDef.Structure, &graph); err != nil {
 			return fmt.Errorf("structure unmarshal failed, %w", err)
 		}
@@ -73,14 +73,14 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd *StartProcessI
 		}
 
 		// 创建流程实例
-		inst := &model.ProcessInstance{
+		inst := &domain.ProcessInstance{
 			DefinitionID:      processDef.ID,
 			ProcessCode:       processDef.Code,
 			SnapshotStructure: processDef.Structure,
 			ParentID:          cmd.ParentID,
 			ParentNodeID:      cmd.ParentNodeID,
 			Variables:         variables,
-			Status:            model.InstanceStatusPending,
+			Status:            domain.InstanceStatusPending,
 			SubmitterID:       cmd.SubmitterID,
 		}
 		instID, err = s.instanceRepo.Create(ctx, inst)
@@ -90,7 +90,7 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd *StartProcessI
 
 		// 创建 Execution 记录
 		// NOTE: 暂时不考虑自动执行节点的情况
-		exec := &model.Execution{
+		exec := &domain.Execution{
 			InstID: inst.ID,
 			NodeID: runtimeGraph.Next[runtimeGraph.StartNode.ID][0].TargetNode, // 从开始节点的下一跳开始执行
 		}
@@ -109,14 +109,14 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, cmd *StartProcessI
 
 // 接受service完成任务的意图
 // 必须是审批类任务完成后才会调用这个接口，其他类型的任务不经过审批，直接由流程引擎自己推进
-func (s *Scheduler) CompleteTask(ctx context.Context, task *model.ProcessTask) error {
+func (s *Scheduler) CompleteTask(ctx context.Context, task *domain.ProcessTask) error {
 	err := s.txManager.InTx(ctx, func(ctx context.Context) error {
 		inst, err := s.instanceRepo.GetByID(ctx, task.InstanceID)
 		if err != nil {
 			return fmt.Errorf("failed to get instance by id: %w", err)
 		}
 		// 2. 解析流程，构建运行时图
-		var graph model.GraphModel
+		var graph domain.GraphModel
 		if err := json.Unmarshal(inst.SnapshotStructure, &graph); err != nil {
 			return fmt.Errorf("structure unmarshal failed, %w", err)
 		}
@@ -128,7 +128,7 @@ func (s *Scheduler) CompleteTask(ctx context.Context, task *model.ProcessTask) e
 			return fmt.Errorf("failed to move token: %w", err)
 		}
 		// 4. 更新任务状态为已完成
-		task.Status = model.TaskStatusApproved
+		task.Status = domain.TaskStatusApproved
 		if err := s.taskCmdRepo.Update(ctx, task); err != nil {
 			return fmt.Errorf("failed to update task status: %w", err)
 		}
@@ -152,21 +152,21 @@ func (s *Scheduler) moveToken(ctx context.Context, executionID int64, nextNodeID
 	// 执行到达节点的处理逻辑
 	// 早期版本不做设计，全部用switch case
 	switch rg.Nodes[nextNodeID].Type {
-	case model.NodeTypeUserTask:
+	case domain.NodeTypeUserTask:
 		if err := s.nodeHanlderUserTask(ctx, exec); err != nil {
 			return fmt.Errorf("failed to handle user task: %w", err)
 		}
-	case model.NodeTypeEnd:
+	case domain.NodeTypeEnd:
 		if err := s.nodeHandlerEndNode(ctx, exec); err != nil {
 			return fmt.Errorf("failed to handle end node: %w", err)
 		}
-	case model.NodeTypeEmailService:
+	case domain.NodeTypeEmailService:
 		if err := s.nodeHandlerEmailService(ctx, exec, rg); err != nil {
 			return fmt.Errorf("failed to handle email service node: %w", err)
 		}
-	case model.NodeTypeForkGateway:
+	case domain.NodeTypeForkGateway:
 		return s.gatewayHandlerFork(ctx, exec, rg)
-	case model.NodeTypeJoinGateway:
+	case domain.NodeTypeJoinGateway:
 		return s.gatewayHandlerJoin(ctx, exec, rg)
 	}
 
@@ -175,13 +175,13 @@ func (s *Scheduler) moveToken(ctx context.Context, executionID int64, nextNodeID
 }
 
 // NodeHanlderUserTask 处理到达用户任务节点的逻辑
-func (s *Scheduler) nodeHanlderUserTask(ctx context.Context, exec *model.Execution) error {
+func (s *Scheduler) nodeHanlderUserTask(ctx context.Context, exec *domain.Execution) error {
 	// 创建用户审批任务
-	task := &model.ProcessTask{
+	task := &domain.ProcessTask{
 		InstanceID:  exec.InstID,
 		ExecutionID: exec.ID,
 		NodeID:      exec.NodeID,
-		Status:      model.TaskStatusPending,
+		Status:      domain.TaskStatusPending,
 	}
 	if err := s.taskCmdRepo.Create(ctx, task); err != nil {
 		return err
@@ -191,19 +191,19 @@ func (s *Scheduler) nodeHanlderUserTask(ctx context.Context, exec *model.Executi
 }
 
 // NodeHandlerEndNode 处理到达END节点的逻辑
-func (s *Scheduler) nodeHandlerEndNode(ctx context.Context, exec *model.Execution) error {
+func (s *Scheduler) nodeHandlerEndNode(ctx context.Context, exec *domain.Execution) error {
 	// 先删除 Execution，再更新流程实例状态
 	if err := s.executionRepo.DeleteByID(ctx, exec.ID); err != nil {
 		return err
 	}
-	if err := s.instanceRepo.UpdateStatus(ctx, exec.InstID, model.InstanceStatusApproved); err != nil {
+	if err := s.instanceRepo.UpdateStatus(ctx, exec.InstID, domain.InstanceStatusApproved); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *Scheduler) nodeHandlerEmailService(ctx context.Context, exec *model.Execution, rg *RuntimeGraph) error {
+func (s *Scheduler) nodeHandlerEmailService(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) error {
 	if s.srvTaskMQ == nil {
 		return fmt.Errorf("service task mq is not initialized")
 	}
@@ -222,7 +222,7 @@ func (s *Scheduler) nodeHandlerEmailService(ctx context.Context, exec *model.Exe
 
 // gatewayHandlerFork 处理到达并行网关的节点
 // TODO: 事务优化
-func (s *Scheduler) gatewayHandlerFork(ctx context.Context, execution *model.Execution, rg *RuntimeGraph) error {
+func (s *Scheduler) gatewayHandlerFork(ctx context.Context, execution *domain.Execution, rg *RuntimeGraph) error {
 	// 先将父 execution 设置为 inactive
 	execution.IsActive = false
 	if err := s.executionRepo.Update(ctx, execution); err != nil {
@@ -231,9 +231,9 @@ func (s *Scheduler) gatewayHandlerFork(ctx context.Context, execution *model.Exe
 
 	// 根据 Edges 的数量创建对应的子 Execution
 	edges := rg.Next[execution.NodeID]
-	execs := make([]model.Execution, 0, len(edges))
+	execs := make([]domain.Execution, 0, len(edges))
 	for _, edge := range edges {
-		execs = append(execs, model.Execution{
+		execs = append(execs, domain.Execution{
 			InstID:   execution.InstID,
 			ParentID: execution.ID,
 			NodeID:   edge.TargetNode, // 直接设置为目标节点
@@ -256,7 +256,7 @@ func (s *Scheduler) gatewayHandlerFork(ctx context.Context, execution *model.Exe
 
 // gatewayHandlerJoin 处理到达合并网关的节点
 // TODO: 事务优化
-func (s *Scheduler) gatewayHandlerJoin(ctx context.Context, execution *model.Execution, rg *RuntimeGraph) error {
+func (s *Scheduler) gatewayHandlerJoin(ctx context.Context, execution *domain.Execution, rg *RuntimeGraph) error {
 	// 保存必要信息，因为 execution 即将被删除
 	parentID := execution.ParentID
 	nodeID := execution.NodeID

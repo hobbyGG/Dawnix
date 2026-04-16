@@ -7,7 +7,7 @@ import (
 
 	"github.com/hobbyGG/Dawnix/client"
 	"github.com/hobbyGG/Dawnix/internal/biz"
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	"github.com/hobbyGG/Dawnix/internal/domain"
 	"github.com/hobbyGG/Dawnix/util"
 	"go.uber.org/zap"
 )
@@ -40,7 +40,7 @@ func (s *EmailSendWorker) Start(ctx context.Context) error {
 	s.cancel = cancel
 
 	handler := func(key string, value []byte) error {
-		emailTask := model.EmailNodeParmas{}
+		emailTask := domain.EmailNodeParmas{}
 		if err := json.Unmarshal(value, &emailTask); err != nil {
 			zap.L().Error("unmarshal failed, discarding poison message", zap.Error(err), zap.ByteString("val", value))
 			return err

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/hobbyGG/Dawnix/internal/biz"
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	"github.com/hobbyGG/Dawnix/internal/domain"
 	"go.uber.org/zap"
 )
 
@@ -31,7 +31,7 @@ func (s *InstanceService) CreateInstance(ctx context.Context, cmd *biz.StartProc
 	return id, nil
 }
 
-func (s *InstanceService) ListInstances(ctx context.Context, params *biz.ListInstancesParams) ([]model.ProcessInstance, error) {
+func (s *InstanceService) ListInstances(ctx context.Context, params *biz.ListInstancesParams) ([]domain.ProcessInstance, error) {
 	instances, err := s.instanceRepo.List(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("list instances failed: %w", err)

@@ -1,26 +1,26 @@
 package biz
 
 import (
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	"github.com/hobbyGG/Dawnix/internal/domain"
 )
 
 // 十字链表
 type RuntimeGraph struct {
-	Nodes map[string]*model.NodeModel   // nodeID->NodeConfig的映射
-	Next  map[string][]*model.EdgeModel // nodeID->Edge 以node为起点的所有边
-	Prev  map[string][]*model.EdgeModel // nodeID->Edge 以node为终点的所有边
+	Nodes map[string]*domain.NodeModel   // nodeID->NodeConfig的映射
+	Next  map[string][]*domain.EdgeModel // nodeID->Edge 以node为起点的所有边
+	Prev  map[string][]*domain.EdgeModel // nodeID->Edge 以node为终点的所有边
 
-	StartNode *model.NodeModel
+	StartNode *domain.NodeModel
 }
 
-func NewSchedulerRuntimeGraph(graphModel *model.GraphModel) *RuntimeGraph {
+func NewSchedulerRuntimeGraph(graphModel *domain.GraphModel) *RuntimeGraph {
 	schedulerGraph := &RuntimeGraph{
-		Nodes: make(map[string]*model.NodeModel),
-		Next:  make(map[string][]*model.EdgeModel),
-		Prev:  make(map[string][]*model.EdgeModel),
+		Nodes: make(map[string]*domain.NodeModel),
+		Next:  make(map[string][]*domain.EdgeModel),
+		Prev:  make(map[string][]*domain.EdgeModel),
 	}
 	for _, nodeModel := range graphModel.Nodes {
-		node := &model.NodeModel{
+		node := &domain.NodeModel{
 			ID:         nodeModel.ID,
 			Type:       nodeModel.Type,
 			Name:       nodeModel.Name,
@@ -28,13 +28,13 @@ func NewSchedulerRuntimeGraph(graphModel *model.GraphModel) *RuntimeGraph {
 			Properties: nodeModel.Properties,
 		}
 		schedulerGraph.Nodes[node.ID] = node
-		if node.Type == model.NodeTypeStart {
+		if node.Type == domain.NodeTypeStart {
 			schedulerGraph.StartNode = node
 		}
 	}
 	// 建立Next与Prev
 	for _, edgeModel := range graphModel.Edges {
-		edge := model.EdgeModel{
+		edge := domain.EdgeModel{
 			ID:         edgeModel.ID,
 			SourceNode: edgeModel.SourceNode,
 			TargetNode: edgeModel.TargetNode,

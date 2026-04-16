@@ -3,17 +3,17 @@ package biz
 import (
 	"context"
 
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	"github.com/hobbyGG/Dawnix/internal/domain"
 )
 
 type InstanceRepo interface {
 	// 这里定义Instance相关的数据操作方法
-	Create(ctx context.Context, model *model.ProcessInstance) (int64, error)
-	List(ctx context.Context, params *ListInstancesParams) ([]model.ProcessInstance, error)
-	GetByID(ctx context.Context, id int64) (*model.ProcessInstance, error)
-	GetWithExecutionsByID(ctx context.Context, id int64) (*model.ProcessInstance, []model.Execution, error)
+	Create(ctx context.Context, model *domain.ProcessInstance) (int64, error)
+	List(ctx context.Context, params *ListInstancesParams) ([]domain.ProcessInstance, error)
+	GetByID(ctx context.Context, id int64) (*domain.ProcessInstance, error)
+	GetWithExecutionsByID(ctx context.Context, id int64) (*domain.ProcessInstance, []domain.Execution, error)
 	Delete(ctx context.Context, id int64) error
-	Update(ctx context.Context, model *model.ProcessInstance) error
+	Update(ctx context.Context, model *domain.ProcessInstance) error
 	UpdateStatus(ctx context.Context, id int64, status string) error
 }
 

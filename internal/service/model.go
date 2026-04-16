@@ -1,8 +1,8 @@
 package service
 
-import "github.com/hobbyGG/Dawnix/internal/biz/model"
+import "github.com/hobbyGG/Dawnix/internal/domain"
 
 type InstanceDetail struct {
-	Inst       *model.ProcessInstance `json:"inst"`
-	Executions []model.Execution      `json:"executions"`
+	Inst       *domain.ProcessInstance `json:"inst"`
+	Executions []domain.Execution      `json:"executions"`
 }

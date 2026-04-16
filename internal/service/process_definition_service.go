@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/hobbyGG/Dawnix/internal/biz"
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	"github.com/hobbyGG/Dawnix/internal/domain"
 	"go.uber.org/zap"
 )
 
@@ -27,9 +27,9 @@ func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, pa
 	// 业务校验：流程是否已经存在，唯一字段是否存在冲突
 
 	for _, node := range params.Structure.Nodes {
-		if node.Type == model.NodeTypeEmailService {
+		if node.Type == domain.NodeTypeEmailService {
 			// 验证参数
-			var emailParams model.EmailNodeParmas
+			var emailParams domain.EmailNodeParmas
 			if err := json.Unmarshal(node.Properties, &emailParams); err != nil {
 				return 0, fmt.Errorf("fail to unmarshal email service properties: %w", err)
 			}
@@ -47,7 +47,7 @@ func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, pa
 	return id, nil
 }
 
-func (s *ProcessDefinitionService) ListProcessDefinitions(ctx context.Context, params *biz.ProcessDefinitionListParams) ([]model.ProcessDefinition, error) {
+func (s *ProcessDefinitionService) ListProcessDefinitions(ctx context.Context, params *biz.ProcessDefinitionListParams) ([]domain.ProcessDefinition, error) {
 	// 这里实现获取流程模板列表的业务逻辑
 	// 业务校验：分页参数是否合法
 	pdList, err := s.repo.List(ctx, params)
@@ -57,7 +57,7 @@ func (s *ProcessDefinitionService) ListProcessDefinitions(ctx context.Context, p
 	return pdList, nil
 }
 
-func (s *ProcessDefinitionService) GetProcessDefinitionDetail(ctx context.Context, id int64) (*model.ProcessDefinition, error) {
+func (s *ProcessDefinitionService) GetProcessDefinitionDetail(ctx context.Context, id int64) (*domain.ProcessDefinition, error) {
 	// 这里实现获取流程模板详情的业务逻辑
 	pdDetail, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -74,7 +74,7 @@ func (s *ProcessDefinitionService) DeleteProcessDefinition(ctx context.Context, 
 	return nil
 }
 
-func (s *ProcessDefinitionService) UpdateProcessDefinition(ctx context.Context, model *model.ProcessDefinition) error {
+func (s *ProcessDefinitionService) UpdateProcessDefinition(ctx context.Context, model *domain.ProcessDefinition) error {
 	// 这里实现更新流程模板的业务逻辑
 	// 业务校验：流程模板是否存在，唯一字段是否冲突等
 	err := s.repo.Update(ctx, model)

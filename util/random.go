@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	"github.com/hobbyGG/Dawnix/internal/domain"
 	"gorm.io/datatypes"
 )
 
@@ -18,30 +18,30 @@ func RandomString(prefix string) string {
 	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
 }
 
-func RandomGraphStartUserEnd() *model.GraphModel {
+func RandomGraphStartUserEnd() *domain.GraphModel {
 	startID := RandomString("start")
 	userID := RandomString("user")
 	endID := RandomString("end")
 
-	return &model.GraphModel{
-		Nodes: []model.NodeModel{
-			{ID: startID, Type: model.NodeTypeStart, Name: "Start"},
-			{ID: userID, Type: model.NodeTypeUserTask, Name: "Approve", Candidates: model.Candidates{Users: []string{RandomString("user")}}},
-			{ID: endID, Type: model.NodeTypeEnd, Name: "End"},
+	return &domain.GraphModel{
+		Nodes: []domain.NodeModel{
+			{ID: startID, Type: domain.NodeTypeStart, Name: "Start"},
+			{ID: userID, Type: domain.NodeTypeUserTask, Name: "Approve", Candidates: domain.Candidates{Users: []string{RandomString("user")}}},
+			{ID: endID, Type: domain.NodeTypeEnd, Name: "End"},
 		},
-		Edges: []model.EdgeModel{
+		Edges: []domain.EdgeModel{
 			{ID: RandomString("edge"), SourceNode: startID, TargetNode: userID},
 			{ID: RandomString("edge"), SourceNode: userID, TargetNode: endID},
 		},
 	}
 }
 
-func RandomProcessDefinition(graph *model.GraphModel) *model.ProcessDefinition {
+func RandomProcessDefinition(graph *domain.GraphModel) *domain.ProcessDefinition {
 	if graph == nil {
 		graph = RandomGraphStartUserEnd()
 	}
 
-	return &model.ProcessDefinition{
+	return &domain.ProcessDefinition{
 		Code:      RandomString("def_code"),
 		Version:   1,
 		Name:      RandomString("def_name"),
@@ -51,7 +51,7 @@ func RandomProcessDefinition(graph *model.GraphModel) *model.ProcessDefinition {
 	}
 }
 
-func RandomProcessInstance(definitionID int64, processCode string, graph *model.GraphModel) *model.ProcessInstance {
+func RandomProcessInstance(definitionID int64, processCode string, graph *domain.GraphModel) *domain.ProcessInstance {
 	if graph == nil {
 		graph = RandomGraphStartUserEnd()
 	}
@@ -59,30 +59,30 @@ func RandomProcessInstance(definitionID int64, processCode string, graph *model.
 		processCode = RandomString("inst_code")
 	}
 
-	return &model.ProcessInstance{
+	return &domain.ProcessInstance{
 		DefinitionID:      definitionID,
 		ProcessCode:       processCode,
 		SnapshotStructure: MustJSON(graph),
 		ParentID:          0,
 		ParentNodeID:      "",
 		Variables:         datatypes.JSON([]byte(`{"amount":100}`)),
-		Status:            model.InstanceStatusPending,
+		Status:            domain.InstanceStatusPending,
 		SubmitterID:       RandomString("submitter"),
 	}
 }
 
-func RandomProcessTask(instanceID, executionID int64, nodeID string) *model.ProcessTask {
+func RandomProcessTask(instanceID, executionID int64, nodeID string) *domain.ProcessTask {
 	if nodeID == "" {
 		nodeID = RandomString("node")
 	}
 
-	return &model.ProcessTask{
+	return &domain.ProcessTask{
 		InstanceID:  instanceID,
 		ExecutionID: executionID,
-		Type:        model.TaskTypeUser,
+		Type:        domain.TaskTypeUser,
 		Assignee:    RandomString("assignee"),
 		Candidates:  []string{RandomString("user")},
-		Status:      model.TaskStatusPending,
+		Status:      domain.TaskStatusPending,
 	}
 }
 

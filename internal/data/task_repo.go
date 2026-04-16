@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"github.com/hobbyGG/Dawnix/internal/biz"
-	"github.com/hobbyGG/Dawnix/internal/biz/model"
+	dataModel "github.com/hobbyGG/Dawnix/internal/data/model"
+	domain "github.com/hobbyGG/Dawnix/internal/domain"
 )
 
 type TaskRepo struct {
@@ -27,21 +28,23 @@ func NewQueryTaskRepo(db *Data) biz.TaskQueryRepo {
 var _ biz.TaskCommandRepo = (*TaskRepo)(nil)
 var _ biz.TaskQueryRepo = (*TaskRepo)(nil)
 
-func (repo *TaskRepo) Create(ctx context.Context, task *model.ProcessTask) error {
-	if err := repo.db.DB(ctx).WithContext(ctx).Create(task).Error; err != nil {
+func (repo *TaskRepo) Create(ctx context.Context, task *domain.ProcessTask) error {
+	poTask := processTaskToPO(task)
+	if err := repo.db.DB(ctx).WithContext(ctx).Create(poTask).Error; err != nil {
 		return err
 	}
+	task.ID = poTask.ID
 	return nil
 }
 
-func (r *TaskRepo) GetByID(ctx context.Context, taskID int64) (*model.ProcessTask, error) {
-	var task model.ProcessTask
+func (r *TaskRepo) GetByID(ctx context.Context, taskID int64) (*domain.ProcessTask, error) {
+	var task dataModel.ProcessTask
 	err := r.db.DB(ctx).WithContext(ctx).First(&task, taskID).Error
-	return &task, err
+	return task.ToDomain(), err
 }
 
-func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*model.TaskView, error) {
-	var result model.TaskView
+func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*domain.TaskView, error) {
+	var result domain.TaskView
 
 	err := r.db.DB(ctx).WithContext(ctx).Table("process_tasks as t").
 		Select(`
@@ -73,8 +76,8 @@ func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*model.Task
 	return &result, nil
 }
 
-func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksParams) ([]*model.TaskView, int64, error) {
-	var results []*model.TaskView
+func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksParams) ([]*domain.TaskView, int64, error) {
+	var results []*domain.TaskView
 	var total int64
 
 	// 1. 基础查询：关联表
@@ -128,9 +131,33 @@ func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksPara
 	return results, total, err
 }
 
-func (repo *TaskRepo) Update(ctx context.Context, task *model.ProcessTask) error {
-	if err := repo.db.DB(ctx).WithContext(ctx).Save(task).Error; err != nil {
+func (repo *TaskRepo) Update(ctx context.Context, task *domain.ProcessTask) error {
+	if err := repo.db.DB(ctx).WithContext(ctx).Save(processTaskToPO(task)).Error; err != nil {
 		return err
 	}
 	return nil
+}
+
+func processTaskToPO(src *domain.ProcessTask) *dataModel.ProcessTask {
+	if src == nil {
+		return nil
+	}
+	return &dataModel.ProcessTask{
+		BaseModel: dataModel.BaseModel{
+			ID:        src.ID,
+			CreatedAt: src.CreatedAt,
+			UpdatedAt: src.UpdatedAt,
+			CreatedBy: src.CreatedBy,
+			UpdatedBy: src.UpdatedBy,
+		},
+		InstanceID:  src.InstanceID,
+		ExecutionID: src.ExecutionID,
+		NodeID:      src.NodeID,
+		Type:        src.Type,
+		Assignee:    src.Assignee,
+		Candidates:  src.Candidates,
+		Status:      src.Status,
+		Action:      src.Action,
+		Comment:     src.Comment,
+	}
 }
