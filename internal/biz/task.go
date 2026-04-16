@@ -7,18 +7,10 @@ import (
 	"gorm.io/datatypes"
 )
 
-type TaskCommandRepo interface {
+type TaskRepo interface {
 	Create(ctx context.Context, task *domain.ProcessTask) error
 	GetByID(ctx context.Context, taskID int64) (*domain.ProcessTask, error)
 	Update(ctx context.Context, task *domain.ProcessTask) error
-}
-
-// ==========================================
-// 接口 2: TaskQueryRepo
-// 给谁用: HTTP API (前端列表)
-// 特点: 出参是 Read Model (TaskSummary)
-// ==========================================
-type TaskQueryRepo interface {
 	GetDetailView(ctx context.Context, taskID int64) (*domain.TaskView, error)
 	ListWithFilter(ctx context.Context, params *ListTasksParams) ([]*domain.TaskView, int64, error)
 }

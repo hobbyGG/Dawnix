@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/hobbyGG/Dawnix/client"
-	"github.com/hobbyGG/Dawnix/internal/biz"
+	"github.com/hobbyGG/Dawnix/internal/data"
 	"github.com/hobbyGG/Dawnix/worker"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
@@ -91,7 +91,7 @@ func InitWorker(c *workerConfig) (*worker.EmailSendWorker, error) {
 	}
 
 	ecli := client.NewEmailClient(c.SMTPToken, c.Email)
-	mq := biz.NewRedisMQ(rdb)
+	mq := data.NewRedisMQ(rdb)
 	eSendWorker := worker.NewEmailSender(ecli, mq)
 	go eSendWorker.Start(context.Background())
 

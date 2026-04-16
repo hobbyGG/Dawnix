@@ -23,10 +23,10 @@ type ListInstancesParams struct {
 }
 
 type InstanceScheduler interface {
-	StartProcessInstance(ctx context.Context, cmd *StartProcessInstanceCmd) (int64, error)
+	StartProcessInstance(ctx context.Context, params *StartProcessInstanceParams) (int64, error)
 }
 
-type StartProcessInstanceCmd struct {
+type StartProcessInstanceParams struct {
 	// 定义了调用StartProcessInstance必须提供的所有信息
 	ProcessCode  string                 // 流程业务code
 	SubmitterID  string                 // 流程发起人

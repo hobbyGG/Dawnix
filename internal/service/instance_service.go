@@ -19,12 +19,12 @@ func NewInstanceService(instanceRepo biz.InstanceRepo, scheduler biz.InstanceSch
 	return &InstanceService{instanceRepo: instanceRepo, scheduler: scheduler, logger: logger}
 }
 
-func (s *InstanceService) CreateInstance(ctx context.Context, cmd *biz.StartProcessInstanceCmd) (int64, error) {
+func (s *InstanceService) CreateInstance(ctx context.Context, params *biz.StartProcessInstanceParams) (int64, error) {
 	// 业务校验
-	// 对cmd的一些字段进行业务上的校验
+	// 对params的一些字段进行业务上的校验
 
 	// 启动一个流程实例
-	id, err := s.scheduler.StartProcessInstance(ctx, cmd)
+	id, err := s.scheduler.StartProcessInstance(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("scheduler start process instance failed: %w", err)
 	}

@@ -10,18 +10,17 @@ import (
 )
 
 type TaskService struct {
-	cmd       biz.TaskCommandRepo
-	query     biz.TaskQueryRepo
+	repo      biz.TaskRepo
 	scheduler biz.TaskScheduler
 	logger    *zap.Logger
 }
 
-func NewTaskService(cmd biz.TaskCommandRepo, query biz.TaskQueryRepo, scheduler biz.TaskScheduler, logger *zap.Logger) *TaskService {
-	return &TaskService{cmd: cmd, query: query, scheduler: scheduler, logger: logger}
+func NewTaskService(repo biz.TaskRepo, scheduler biz.TaskScheduler, logger *zap.Logger) *TaskService {
+	return &TaskService{repo: repo, scheduler: scheduler, logger: logger}
 }
 
 func (s *TaskService) GetTaskDetailView(ctx context.Context, taskID int64) (*domain.TaskView, error) {
-	detailView, err := s.query.GetDetailView(ctx, taskID)
+	detailView, err := s.repo.GetDetailView(ctx, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task detail: %w", err)
 	}
@@ -38,7 +37,7 @@ func (s *TaskService) ListTasksView(ctx context.Context, params *biz.ListTasksPa
 	default:
 		return nil, 0, fmt.Errorf("unsupported task scope: %s", params.Scope)
 	}
-	taskViews, total, err := s.query.ListWithFilter(ctx, params)
+	taskViews, total, err := s.repo.ListWithFilter(ctx, params)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list tasks: %w", err)
 	}
@@ -47,7 +46,7 @@ func (s *TaskService) ListTasksView(ctx context.Context, params *biz.ListTasksPa
 
 func (s *TaskService) CompleteTask(ctx context.Context, params *biz.CompleteTaskParams) error {
 	// 根据id拿到任务实例
-	task, err := s.cmd.GetByID(ctx, params.TaskID)
+	task, err := s.repo.GetByID(ctx, params.TaskID)
 	if err != nil {
 		return fmt.Errorf("failed to get task detail: %w", err)
 	}
@@ -63,9 +62,6 @@ func (s *TaskService) CompleteTask(ctx context.Context, params *biz.CompleteTask
 	// 3. 通知调度器完成任务
 	if err := s.scheduler.CompleteTask(ctx, task); err != nil {
 		return fmt.Errorf("failed to complete task in scheduler: %w", err)
-	}
-	if err := s.cmd.Update(ctx, task); err != nil {
-		return fmt.Errorf("failed to update task status: %w", err)
 	}
 	return nil
 }

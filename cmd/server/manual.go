@@ -69,11 +69,16 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 	processDefinitionRepo := data.NewProcessDefinitionRepo(dataObj)
 	instanceRepo := data.NewInstanceRepo(dataObj)
 	executionRepo := data.NewExecutionRepo(dataObj)
-	taskCmdRepo := data.NewCommandTaskRepo(dataObj)
-	taskQueryRepo := data.NewQueryTaskRepo(dataObj)
+	taskRepo := data.NewTaskRepo(dataObj)
 
-	// MQ 初始化
-	mq := biz.NewRedisMQ(rdb)
+	// MQ 初始化（基础设施实现位于 data 层）
+	mq := data.NewRedisMQ(rdb)
+	nodeRegistry := biz.NewDefaultNodeRegistry(biz.NodeDeps{
+		TaskRepo:      taskRepo,
+		InstanceRepo:  instanceRepo,
+		ExecutionRepo: executionRepo,
+		ServiceTaskMQ: data.NewServiceTaskMQ(mq),
+	})
 
 	// scheduler初始化
 	txManager := data.NewTransactionManager(db)
@@ -82,8 +87,8 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 		processDefinitionRepo,
 		instanceRepo,
 		executionRepo,
-		taskCmdRepo,
-		biz.NewServiceTaskMQImpl(mq),
+		taskRepo,
+		nodeRegistry,
 	)
 
 	processDefinitionSvc := service.NewProcessDefinitionService(processDefinitionRepo, logger)
@@ -92,7 +97,7 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 	instanceSvc := service.NewInstanceService(instanceRepo, scheduler, logger)
 	instanceHandler := api.NewInstanceHandler(instanceSvc, logger)
 
-	taskSvc := service.NewTaskService(taskCmdRepo, taskQueryRepo, scheduler, logger)
+	taskSvc := service.NewTaskService(taskRepo, scheduler, logger)
 	taskHandler := api.NewTaskHandler(taskSvc, logger)
 
 	r := api.NewRouter(processDefinitionHandler, instanceHandler, taskHandler)

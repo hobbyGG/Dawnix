@@ -34,7 +34,7 @@ type Candidates struct {
 	Users []string `json:"users"`
 }
 
-type EmailNodeParmas struct {
+type EmailNodeParams struct {
 	To      string `json:"to"`
 	Subject string `json:"subject"`
 	Body    string `json:"body"`

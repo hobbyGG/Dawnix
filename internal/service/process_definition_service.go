@@ -29,7 +29,7 @@ func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, pa
 	for _, node := range params.Structure.Nodes {
 		if node.Type == domain.NodeTypeEmailService {
 			// 验证参数
-			var emailParams domain.EmailNodeParmas
+			var emailParams domain.EmailNodeParams
 			if err := json.Unmarshal(node.Properties, &emailParams); err != nil {
 				return 0, fmt.Errorf("fail to unmarshal email service properties: %w", err)
 			}

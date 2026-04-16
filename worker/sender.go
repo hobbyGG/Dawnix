@@ -40,7 +40,7 @@ func (s *EmailSendWorker) Start(ctx context.Context) error {
 	s.cancel = cancel
 
 	handler := func(key string, value []byte) error {
-		emailTask := domain.EmailNodeParmas{}
+		emailTask := domain.EmailNodeParams{}
 		if err := json.Unmarshal(value, &emailTask); err != nil {
 			zap.L().Error("unmarshal failed, discarding poison message", zap.Error(err), zap.ByteString("val", value))
 			return err

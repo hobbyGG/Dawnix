@@ -36,8 +36,8 @@ func (h *InstanceHandler) Create(c *gin.Context) {
 		return
 	}
 	// 调用服务层创建实例
-	createInstacneCmd := req.ToBizCmd()
-	id, err := h.svc.CreateInstance(c, createInstacneCmd)
+	createInstanceParams := req.ToBizParams()
+	id, err := h.svc.CreateInstance(c, createInstanceParams)
 	if err != nil {
 		h.logger.Error("failed to create instance", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -112,8 +112,8 @@ type CreateInstanceReq struct {
 	ParentNodeID string `json:"parent_node_id"`
 }
 
-func (r *CreateInstanceReq) ToBizCmd() *biz.StartProcessInstanceCmd {
-	return &biz.StartProcessInstanceCmd{
+func (r *CreateInstanceReq) ToBizParams() *biz.StartProcessInstanceParams {
+	return &biz.StartProcessInstanceParams{
 		ProcessCode:  r.ProcessCode,
 		SubmitterID:  r.SubmitterID,
 		Variables:    r.Variables,

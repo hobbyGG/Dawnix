@@ -13,20 +13,13 @@ type TaskRepo struct {
 	db *Data
 }
 
-func NewCommandTaskRepo(db *Data) biz.TaskCommandRepo {
+func NewTaskRepo(db *Data) biz.TaskRepo {
 	return &TaskRepo{
 		db: db,
 	}
 }
 
-func NewQueryTaskRepo(db *Data) biz.TaskQueryRepo {
-	return &TaskRepo{
-		db: db,
-	}
-}
-
-var _ biz.TaskCommandRepo = (*TaskRepo)(nil)
-var _ biz.TaskQueryRepo = (*TaskRepo)(nil)
+var _ biz.TaskRepo = (*TaskRepo)(nil)
 
 func (repo *TaskRepo) Create(ctx context.Context, task *domain.ProcessTask) error {
 	poTask := processTaskToPO(task)
