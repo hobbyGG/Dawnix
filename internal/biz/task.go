@@ -49,12 +49,13 @@ type CreateTaskParams struct {
 	ExpireAt *int64
 
 	// 上下文变量快照 (可选)
-	Variables datatypes.JSON
+	FormData datatypes.JSON
 }
 
 type CompleteTaskParams struct {
-	TaskID  int64
-	Action  string
-	UserID  int64
-	Comment string
+	TaskID   int64
+	Action   string
+	UserID   int64
+	Comment  string
+	FormData map[string]interface{}
 }

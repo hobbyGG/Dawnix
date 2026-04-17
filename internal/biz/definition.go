@@ -2,14 +2,22 @@ package biz
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/hobbyGG/Dawnix/internal/domain"
 )
 
+type FormDefinitionItem struct {
+	Key   string          `json:"key"`
+	Value json.RawMessage `json:"value"`
+	Type  string          `json:"type"`
+}
+
 type ProcessDefinitionCreateParams struct {
-	Name      string
-	Code      string
-	Structure *domain.GraphModel
+	Name           string
+	Code           string
+	Structure      *domain.GraphModel
+	FormDefinition []FormDefinitionItem
 }
 
 type ProcessDefinitionListParams struct {

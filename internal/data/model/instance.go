@@ -15,7 +15,7 @@ type ProcessInstance struct {
 	SnapshotStructure datatypes.JSON `gorm:"type:jsonb;not null" json:"snapshot_structure"`
 	ParentID          int64          `gorm:"index;default:0" json:"parent_id"`
 	ParentNodeID      string         `gorm:"type:varchar(64)" json:"parent_node_id"`
-	Variables         datatypes.JSON `gorm:"type:jsonb;default:'{}'" json:"variables"`
+	FormData          datatypes.JSON `gorm:"type:jsonb;column:form_data;default:'{}'" json:"form_data"`
 	Status            string         `gorm:"type:varchar(32);index;default:'PENDING'" json:"status"`
 	SubmitterID       string         `gorm:"type:varchar(64);index" json:"submitter_id"`
 	FinishedAt        *time.Time     `json:"finished_at"`
@@ -42,7 +42,7 @@ func (p *ProcessInstance) ToDomain() *domain.ProcessInstance {
 		SnapshotStructure: p.SnapshotStructure,
 		ParentID:          p.ParentID,
 		ParentNodeID:      p.ParentNodeID,
-		Variables:         p.Variables,
+		FormData:          p.FormData,
 		Status:            p.Status,
 		SubmitterID:       p.SubmitterID,
 		FinishedAt:        p.FinishedAt,

@@ -42,12 +42,12 @@ func RandomProcessDefinition(graph *domain.GraphModel) *domain.ProcessDefinition
 	}
 
 	return &domain.ProcessDefinition{
-		Code:      RandomString("def_code"),
-		Version:   1,
-		Name:      RandomString("def_name"),
-		Structure: MustJSON(graph),
-		Config:    datatypes.JSON([]byte("{}")),
-		IsActive:  true,
+		Code:           RandomString("def_code"),
+		Version:        1,
+		Name:           RandomString("def_name"),
+		Structure:      MustJSON(graph),
+		FormDefinition: datatypes.JSON([]byte("{}")),
+		IsActive:       true,
 	}
 }
 
@@ -65,7 +65,7 @@ func RandomProcessInstance(definitionID int64, processCode string, graph *domain
 		SnapshotStructure: MustJSON(graph),
 		ParentID:          0,
 		ParentNodeID:      "",
-		Variables:         datatypes.JSON([]byte(`{"amount":100}`)),
+		FormData:          datatypes.JSON([]byte(`{"amount":100}`)),
 		Status:            domain.InstanceStatusPending,
 		SubmitterID:       RandomString("submitter"),
 	}

@@ -22,7 +22,7 @@ type ProcessInstance struct {
 	SnapshotStructure datatypes.JSON
 	ParentID          int64
 	ParentNodeID      string
-	Variables         datatypes.JSON
+	FormData          datatypes.JSON
 	Status            string
 	SubmitterID       string
 	FinishedAt        *time.Time

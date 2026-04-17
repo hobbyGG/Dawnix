@@ -105,7 +105,7 @@ type CreateInstanceReq struct {
 	SubmitterID string `json:"submitter_id" binding:"required"`
 
 	// 业务表单数据 (可选)
-	Variables map[string]interface{} `json:"variables"`
+	FormData map[string]interface{} `json:"form_data"`
 
 	// 父流程相关 (可选，用于子流程场景)
 	ParentID     int64  `json:"parent_id"`
@@ -116,7 +116,7 @@ func (r *CreateInstanceReq) ToBizParams() *biz.StartProcessInstanceParams {
 	return &biz.StartProcessInstanceParams{
 		ProcessCode:  r.ProcessCode,
 		SubmitterID:  r.SubmitterID,
-		Variables:    r.Variables,
+		FormData:     r.FormData,
 		ParentID:     r.ParentID,
 		ParentNodeID: r.ParentNodeID,
 	}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/hobbyGG/Dawnix/internal/biz"
@@ -57,7 +58,15 @@ func (s *TaskService) CompleteTask(ctx context.Context, params *biz.CompleteTask
 
 	// 业务处理
 	task.Status = domain.TaskStatusApproved
+	task.Action = params.Action
 	task.Comment = params.Comment // 保存审批意见
+	if params.FormData != nil {
+		payload, err := json.Marshal(params.FormData)
+		if err != nil {
+			return fmt.Errorf("marshal form_data failed: %w", err)
+		}
+		task.FormData = payload
+	}
 
 	// 3. 通知调度器完成任务
 	if err := s.scheduler.CompleteTask(ctx, task); err != nil {

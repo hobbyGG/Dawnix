@@ -113,10 +113,10 @@ func (h *ProcessDefinitionHandler) Delete(c *gin.Context) {
 }
 
 type ProcessDefinitionCreateReq struct {
-	Code      string           `json:"code"`                         // 流程模板业务号，用于创建流程
-	Name      string           `json:"name" binding:"required"`      // 流程模板名称
-	Structure ProcessStructure `json:"structure" binding:"required"` // 流程模板图结构
-	Config    ProcessConfig    `json:"config"`                       // 流程全局配置，例如该流程结束后处理配置等
+	Code           string                   `json:"code"`                         // 流程模板业务号，用于创建流程
+	Name           string                   `json:"name" binding:"required"`      // 流程模板名称
+	Structure      ProcessStructure         `json:"structure" binding:"required"` // 流程模板图结构
+	FormDefinition []biz.FormDefinitionItem `json:"form_definition"`              // 表单定义项列表
 }
 
 // ProcessStructure 对应 ReactFlow 的导出对象
@@ -146,18 +146,6 @@ type ProcessEdge struct {
 	TargetNode string `json:"target"` // 目标节点ID
 }
 
-// ProcessConfig 流程全局配置
-type ProcessConfig struct {
-	// AutoApprove: 是否开启自动去重/自动通过
-	AutoApprove bool `json:"auto_approve"`
-
-	// Timeout: 全局超时时间 (秒)，0表示不超时
-	Timeout int64 `json:"timeout"`
-
-	// CallbackURL: 流程结束后的回调地址 (Webhook)
-	CallbackURL string `json:"callback_url"`
-}
-
 func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateParams {
 	// 这里需要将 ProcessStructure 转换为 graph结构
 	graph := domain.GraphModel{
@@ -185,9 +173,10 @@ func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateP
 		graph.Edges = append(graph.Edges, workflowEdge)
 	}
 	return &biz.ProcessDefinitionCreateParams{
-		Name:      r.Name,
-		Code:      r.Code,
-		Structure: &graph,
+		Name:           r.Name,
+		Code:           r.Code,
+		Structure:      &graph,
+		FormDefinition: r.FormDefinition,
 	}
 }
 

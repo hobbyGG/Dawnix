@@ -122,8 +122,8 @@ type CompleteTaskReq struct {
 	// 审批意见
 	Comment string `json:"comment"`
 
-	// 变量: 比如请假表单里的实际数据，或者审批人填写的新字段
-	Variables map[string]interface{} `json:"variables"`
+	// 表单数据: 比如请假表单里的实际数据，或者审批人填写的新字段
+	FormData map[string]interface{} `json:"form_data"`
 
 	// 当前操作人 (Middleware 注入)
 	CurrentUserID int64 `json:"-"`
@@ -131,9 +131,10 @@ type CompleteTaskReq struct {
 
 func (req *CompleteTaskReq) ToBizParams() *biz.CompleteTaskParams {
 	return &biz.CompleteTaskParams{
-		TaskID:  req.ID,
-		UserID:  req.CurrentUserID,
-		Action:  req.Action,
-		Comment: req.Comment,
+		TaskID:   req.ID,
+		UserID:   req.CurrentUserID,
+		Action:   req.Action,
+		Comment:  req.Comment,
+		FormData: req.FormData,
 	}
 }

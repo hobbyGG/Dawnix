@@ -100,11 +100,11 @@ func processDefinitionToPO(src *domain.ProcessDefinition) *dataModel.ProcessDefi
 			CreatedBy: src.CreatedBy,
 			UpdatedBy: src.UpdatedBy,
 		},
-		Code:      src.Code,
-		Version:   src.Version,
-		Name:      src.Name,
-		Structure: src.Structure,
-		Config:    src.Config,
-		IsActive:  src.IsActive,
+		Code:           src.Code,
+		Version:        src.Version,
+		Name:           src.Name,
+		Structure:      src.Structure,
+		FormDefinition: src.FormDefinition,
+		IsActive:       src.IsActive,
 	}
 }

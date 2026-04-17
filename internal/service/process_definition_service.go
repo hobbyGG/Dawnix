@@ -25,6 +25,9 @@ func NewProcessDefinitionService(repo biz.ProcessDefinitionRepo, logger *zap.Log
 func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, params *biz.ProcessDefinitionCreateParams) (int64, error) {
 	// 这里实现创建流程模板的业务逻辑
 	// 业务校验：流程是否已经存在，唯一字段是否存在冲突
+	if err := validateFormDefinition(params.FormDefinition); err != nil {
+		return 0, fmt.Errorf("invalid form_definition: %w", err)
+	}
 
 	for _, node := range params.Structure.Nodes {
 		if node.Type == domain.NodeTypeEmailService {
@@ -45,6 +48,24 @@ func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, pa
 		return 0, fmt.Errorf("create failed: %w", err)
 	}
 	return id, nil
+}
+
+func validateFormDefinition(items []biz.FormDefinitionItem) error {
+	for i, item := range items {
+		if item.Key == "" {
+			return fmt.Errorf("item[%d].key is required", i)
+		}
+		if item.Type == "" {
+			return fmt.Errorf("item[%d].type is required", i)
+		}
+		if len(item.Value) == 0 {
+			return fmt.Errorf("item[%d].value is required", i)
+		}
+		if !json.Valid(item.Value) {
+			return fmt.Errorf("item[%d].value must be valid json", i)
+		}
+	}
+	return nil
 }
 
 func (s *ProcessDefinitionService) ListProcessDefinitions(ctx context.Context, params *biz.ProcessDefinitionListParams) ([]domain.ProcessDefinition, error) {

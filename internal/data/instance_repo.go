@@ -104,7 +104,7 @@ func processInstanceToPO(src *domain.ProcessInstance) *dataModel.ProcessInstance
 		SnapshotStructure: src.SnapshotStructure,
 		ParentID:          src.ParentID,
 		ParentNodeID:      src.ParentNodeID,
-		Variables:         src.Variables,
+		FormData:          src.FormData,
 		Status:            src.Status,
 		SubmitterID:       src.SubmitterID,
 		FinishedAt:        src.FinishedAt,

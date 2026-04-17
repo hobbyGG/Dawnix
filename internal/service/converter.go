@@ -15,10 +15,18 @@ func paramsToProcessDef(params *biz.ProcessDefinitionCreateParams) (*domain.Proc
 	if err != nil {
 		return nil, fmt.Errorf("fail to marshal structure: %w", err)
 	}
+	if params.FormDefinition == nil {
+		params.FormDefinition = []biz.FormDefinitionItem{}
+	}
+	formDefinitionJSON, err := json.Marshal(params.FormDefinition)
+	if err != nil {
+		return nil, fmt.Errorf("fail to marshal form_definition: %w", err)
+	}
 
 	return &domain.ProcessDefinition{
-		Code:      params.Code,
-		Name:      params.Name,
-		Structure: strctureJson,
+		Code:           params.Code,
+		Name:           params.Name,
+		Structure:      strctureJson,
+		FormDefinition: formDefinitionJSON,
 	}, nil
 }

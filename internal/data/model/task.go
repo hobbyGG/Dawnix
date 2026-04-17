@@ -1,19 +1,23 @@
 package model
 
-import domain "github.com/hobbyGG/Dawnix/internal/domain"
+import (
+	domain "github.com/hobbyGG/Dawnix/internal/domain"
+	"gorm.io/datatypes"
+)
 
 type ProcessTask struct {
 	BaseModel
 
-	InstanceID  int64    `gorm:"index;not null"`
-	ExecutionID int64    `gorm:"index"`
-	NodeID      string   `gorm:"type:varchar(64);index"`
-	Type        string   `gorm:"type:varchar(32);default:'user_task'"`
-	Assignee    string   `gorm:"type:varchar(64);index"`
-	Candidates  []string `gorm:"type:json"`
-	Status      string   `gorm:"type:varchar(32);default:'PENDING';index"`
-	Action      string   `gorm:"type:varchar(32)"`
-	Comment     string   `gorm:"type:text"`
+	InstanceID  int64          `gorm:"index;not null"`
+	ExecutionID int64          `gorm:"index"`
+	NodeID      string         `gorm:"type:varchar(64);index"`
+	Type        string         `gorm:"type:varchar(32);default:'user_task'"`
+	Assignee    string         `gorm:"type:varchar(64);index"`
+	Candidates  []string       `gorm:"type:json"`
+	Status      string         `gorm:"type:varchar(32);default:'PENDING';index"`
+	Action      string         `gorm:"type:varchar(32)"`
+	Comment     string         `gorm:"type:text"`
+	FormData    datatypes.JSON `gorm:"type:jsonb;column:form_data;default:'{}'" json:"form_data"`
 }
 
 func (ProcessTask) TableName() string {
@@ -41,5 +45,6 @@ func (p *ProcessTask) ToDomain() *domain.ProcessTask {
 		Status:      p.Status,
 		Action:      p.Action,
 		Comment:     p.Comment,
+		FormData:    p.FormData,
 	}
 }

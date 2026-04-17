@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/datatypes"
+)
 
 const (
 	TaskStatusPending     = "PENDING"
@@ -31,6 +35,7 @@ type ProcessTask struct {
 	Status      string
 	Action      string
 	Comment     string
+	FormData    datatypes.JSON
 }
 
 type TaskView struct {

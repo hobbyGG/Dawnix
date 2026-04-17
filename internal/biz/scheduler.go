@@ -69,9 +69,9 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, params *StartProce
 			return fmt.Errorf("start node %s has no outgoing edge", runtimeGraph.StartNode.ID())
 		}
 
-		variables, err := json.Marshal(params.Variables)
+		formData, err := json.Marshal(params.FormData)
 		if err != nil {
-			return fmt.Errorf("variables marshal failed, %w", err)
+			return fmt.Errorf("form_data marshal failed: %w", err)
 		}
 
 		// 创建流程实例
@@ -81,7 +81,7 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, params *StartProce
 			SnapshotStructure: processDef.Structure,
 			ParentID:          params.ParentID,
 			ParentNodeID:      params.ParentNodeID,
-			Variables:         variables,
+			FormData:          formData,
 			Status:            domain.InstanceStatusPending,
 			SubmitterID:       params.SubmitterID,
 		}
@@ -124,6 +124,9 @@ func (s *Scheduler) CompleteTask(ctx context.Context, task *domain.ProcessTask) 
 		inst, err := s.instanceRepo.GetByID(ctx, task.InstanceID)
 		if err != nil {
 			return fmt.Errorf("failed to get instance by id: %w", err)
+		}
+		if err := s.mergeInstanceFormData(ctx, inst, task.FormData); err != nil {
+			return err
 		}
 		// 解析流程，构建运行时图
 		var graph domain.GraphModel
@@ -265,4 +268,37 @@ func (s *Scheduler) moveToken(ctx context.Context, executionID int64, nextNodeID
 	}
 
 	return exec, task, nil
+}
+
+func (s *Scheduler) mergeInstanceFormData(ctx context.Context, inst *domain.ProcessInstance, taskFormData []byte) error {
+	if inst == nil || len(taskFormData) == 0 {
+		return nil
+	}
+
+	merged := make(map[string]interface{})
+	if len(inst.FormData) > 0 {
+		if err := json.Unmarshal(inst.FormData, &merged); err != nil {
+			return fmt.Errorf("unmarshal instance form data failed: %w", err)
+		}
+	}
+
+	incoming := make(map[string]interface{})
+	if err := json.Unmarshal(taskFormData, &incoming); err != nil {
+		return fmt.Errorf("unmarshal task form data failed: %w", err)
+	}
+
+	for k, v := range incoming {
+		merged[k] = v
+	}
+
+	payload, err := json.Marshal(merged)
+	if err != nil {
+		return fmt.Errorf("marshal merged form data failed: %w", err)
+	}
+	inst.FormData = payload
+	if err := s.instanceRepo.Update(ctx, inst); err != nil {
+		return fmt.Errorf("update instance form data failed: %w", err)
+	}
+
+	return nil
 }

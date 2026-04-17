@@ -48,7 +48,7 @@ func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*domain.Tas
 			t.candidates,
 			t.action,
 			t.comment,
-			t.variables,  -- 详情页需要这个大 JSON
+			t.form_data,  -- 详情页需要这个大 JSON
 			t.created_at as create_time,
 			t.finished_at,
 
@@ -152,5 +152,6 @@ func processTaskToPO(src *domain.ProcessTask) *dataModel.ProcessTask {
 		Status:      src.Status,
 		Action:      src.Action,
 		Comment:     src.Comment,
+		FormData:    src.FormData,
 	}
 }
