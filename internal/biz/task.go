@@ -57,5 +57,5 @@ type CompleteTaskParams struct {
 	Action   string
 	UserID   int64
 	Comment  string
-	FormData map[string]interface{}
+	FormData []FormDataItem
 }

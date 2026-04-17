@@ -41,8 +41,10 @@ func (n *startNode) Handle(ctx context.Context, exec *domain.Execution, rg *Runt
 
 type taskNode struct {
 	nodeBase
-	taskRepo TaskRepo
-	taskType string
+	taskRepo   TaskRepo
+	taskType   string
+	assignee   string
+	candidates []string
 }
 
 func newTaskNode(node *domain.NodeModel, taskRepo TaskRepo, kind string, taskType string) (Node, error) {
@@ -52,7 +54,14 @@ func newTaskNode(node *domain.NodeModel, taskRepo TaskRepo, kind string, taskTyp
 	if taskRepo == nil {
 		return nil, fmt.Errorf("task repo is nil")
 	}
-	return &taskNode{nodeBase: nodeBase{id: node.ID, kind: kind}, taskRepo: taskRepo, taskType: taskType}, nil
+	assignee, candidates := resolveTaskAssignment(node.Candidates.Users)
+	return &taskNode{
+		nodeBase:   nodeBase{id: node.ID, kind: kind},
+		taskRepo:   taskRepo,
+		taskType:   taskType,
+		assignee:   assignee,
+		candidates: candidates,
+	}, nil
 }
 
 func (n *taskNode) Handle(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) (*domain.ProcessTask, error) {
@@ -61,6 +70,8 @@ func (n *taskNode) Handle(ctx context.Context, exec *domain.Execution, rg *Runti
 		ExecutionID: exec.ID,
 		NodeID:      exec.NodeID,
 		Type:        n.taskType,
+		Assignee:    n.assignee,
+		Candidates:  n.candidates,
 		Status:      domain.TaskStatusPending,
 	}
 	if err := n.taskRepo.Create(ctx, task); err != nil {
@@ -139,4 +150,20 @@ func newJoinGatewayNode(node *domain.NodeModel, taskRepo TaskRepo) (Node, error)
 
 func newXorGatewayNode(node *domain.NodeModel, taskRepo TaskRepo) (Node, error) {
 	return newTaskNode(node, taskRepo, domain.NodeTypeXORGateway, domain.TaskTypeReceive)
+}
+
+func newInclusiveGatewayNode(node *domain.NodeModel, taskRepo TaskRepo) (Node, error) {
+	return newTaskNode(node, taskRepo, domain.NodeTypeInclusiveGateway, domain.TaskTypeReceive)
+}
+
+func resolveTaskAssignment(users []string) (string, []string) {
+	if len(users) == 0 {
+		return "", nil
+	}
+	if len(users) == 1 {
+		return users[0], users
+	}
+	candidates := make([]string, len(users))
+	copy(candidates, users)
+	return "", candidates
 }

@@ -28,9 +28,9 @@ type InstanceScheduler interface {
 
 type StartProcessInstanceParams struct {
 	// 定义了调用StartProcessInstance必须提供的所有信息
-	ProcessCode  string                 // 流程业务code
-	SubmitterID  string                 // 流程发起人
-	FormData     map[string]interface{} // 表单数据
-	ParentID     int64                  // 父流程id
-	ParentNodeID string                 // 父流程节点id
+	ProcessCode  string         // 流程业务code
+	SubmitterID  string         // 流程发起人
+	FormData     []FormDataItem // 表单数据
+	ParentID     int64          // 父流程id
+	ParentNodeID string         // 父流程节点id
 }

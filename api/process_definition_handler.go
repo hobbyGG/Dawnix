@@ -113,10 +113,10 @@ func (h *ProcessDefinitionHandler) Delete(c *gin.Context) {
 }
 
 type ProcessDefinitionCreateReq struct {
-	Code           string                   `json:"code"`                         // 流程模板业务号，用于创建流程
-	Name           string                   `json:"name" binding:"required"`      // 流程模板名称
-	Structure      ProcessStructure         `json:"structure" binding:"required"` // 流程模板图结构
-	FormDefinition []biz.FormDefinitionItem `json:"form_definition"`              // 表单定义项列表
+	Code           string             `json:"code"`                         // 流程模板业务号，用于创建流程
+	Name           string             `json:"name" binding:"required"`      // 流程模板名称
+	Structure      ProcessStructure   `json:"structure" binding:"required"` // 流程模板图结构
+	FormDefinition []biz.FormDataItem `json:"form_definition"`              // 表单定义项列表
 }
 
 // ProcessStructure 对应 ReactFlow 的导出对象
@@ -144,6 +144,8 @@ type ProcessEdge struct {
 	ID         string `json:"id"`     // 边ID
 	SourceNode string `json:"source"` // 源节点ID
 	TargetNode string `json:"target"` // 目标节点ID
+	Condition  string `json:"condition"`
+	IsDefault  bool   `json:"is_default"`
 }
 
 func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateParams {
@@ -169,6 +171,8 @@ func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateP
 			ID:         edge.ID,
 			SourceNode: edge.SourceNode,
 			TargetNode: edge.TargetNode,
+			Condition:  edge.Condition,
+			IsDefault:  edge.IsDefault,
 		}
 		graph.Edges = append(graph.Edges, workflowEdge)
 	}

@@ -56,9 +56,21 @@ func (s *TaskService) CompleteTask(ctx context.Context, params *biz.CompleteTask
 		return fmt.Errorf("task %d is not pending (current: %s)", task.ID, task.Status)
 	}
 
+	action := params.Action
+	if action == "" {
+		return fmt.Errorf("action is required")
+	}
+
 	// 业务处理
-	task.Status = domain.TaskStatusApproved
-	task.Action = params.Action
+	switch action {
+	case "agree":
+		task.Status = domain.TaskStatusApproved
+	case "reject":
+		task.Status = domain.TaskStatusRejected
+	default:
+		return fmt.Errorf("unsupported action: %s", params.Action)
+	}
+	task.Action = action
 	task.Comment = params.Comment // 保存审批意见
 	if params.FormData != nil {
 		payload, err := json.Marshal(params.FormData)

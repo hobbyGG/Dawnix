@@ -48,6 +48,9 @@ func NewDefaultNodeRegistry(deps NodeDeps) NodeRegistry {
 		domain.NodeTypeXORGateway: func(node *domain.NodeModel) (Node, error) {
 			return newXorGatewayNode(node, deps.TaskRepo)
 		},
+		domain.NodeTypeInclusiveGateway: func(node *domain.NodeModel) (Node, error) {
+			return newInclusiveGatewayNode(node, deps.TaskRepo)
+		},
 	}
 }
 

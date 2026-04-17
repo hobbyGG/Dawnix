@@ -116,14 +116,14 @@ type CompleteTaskReq struct {
 	// 任务 ID (路径参数)
 	ID int64 `uri:"id"`
 
-	// 动作: "agree", "reject", "transfer"
-	Action string `json:"action" binding:"required"`
+	// 动作: "agree", "reject"
+	Action string `json:"action" binding:"required,oneof=agree reject"`
 
 	// 审批意见
 	Comment string `json:"comment"`
 
 	// 表单数据: 比如请假表单里的实际数据，或者审批人填写的新字段
-	FormData map[string]interface{} `json:"form_data"`
+	FormData []biz.FormDataItem `json:"form_data"`
 
 	// 当前操作人 (Middleware 注入)
 	CurrentUserID int64 `json:"-"`

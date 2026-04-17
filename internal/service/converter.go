@@ -16,7 +16,7 @@ func paramsToProcessDef(params *biz.ProcessDefinitionCreateParams) (*domain.Proc
 		return nil, fmt.Errorf("fail to marshal structure: %w", err)
 	}
 	if params.FormDefinition == nil {
-		params.FormDefinition = []biz.FormDefinitionItem{}
+		params.FormDefinition = []biz.FormDataItem{}
 	}
 	formDefinitionJSON, err := json.Marshal(params.FormDefinition)
 	if err != nil {

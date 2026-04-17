@@ -1,18 +1,30 @@
 package domain
 
 const (
-	NodeTypeStart        = "start"
-	NodeTypeEnd          = "end"
-	NodeTypeUserTask     = "user_task"
-	NodeTypeEmailService = "email_service"
-	NodeTypeForkGateway  = "fork_gateway"
-	NodeTypeJoinGateway  = "join_gateway"
-	NodeTypeXORGateway   = "xor_gateway"
+	NodeTypeStart            = "start"
+	NodeTypeEnd              = "end"
+	NodeTypeUserTask         = "user_task"
+	NodeTypeEmailService     = "email_service"
+	NodeTypeForkGateway      = "fork_gateway"
+	NodeTypeJoinGateway      = "join_gateway"
+	NodeTypeXORGateway       = "xor_gateway"
+	NodeTypeInclusiveGateway = "inclusive_gateway"
 )
 
 type GraphModel struct {
 	Nodes []NodeModel `json:"nodes"`
 	Edges []EdgeModel `json:"edges"`
+}
+
+func (g *GraphModel) EdgesBySource() map[string][]EdgeModel {
+	grouped := make(map[string][]EdgeModel)
+	if g == nil {
+		return grouped
+	}
+	for _, edge := range g.Edges {
+		grouped[edge.SourceNode] = append(grouped[edge.SourceNode], edge)
+	}
+	return grouped
 }
 
 type NodeModel struct {
@@ -28,6 +40,7 @@ type EdgeModel struct {
 	SourceNode string `json:"source_node"`
 	TargetNode string `json:"target_node"`
 	Condition  string `json:"condition"`
+	IsDefault  bool   `json:"is_default,omitempty"`
 }
 
 type Candidates struct {

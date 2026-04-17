@@ -105,7 +105,7 @@ type CreateInstanceReq struct {
 	SubmitterID string `json:"submitter_id" binding:"required"`
 
 	// 业务表单数据 (可选)
-	FormData map[string]interface{} `json:"form_data"`
+	FormData []biz.FormDataItem `json:"form_data"`
 
 	// 父流程相关 (可选，用于子流程场景)
 	ParentID     int64  `json:"parent_id"`
