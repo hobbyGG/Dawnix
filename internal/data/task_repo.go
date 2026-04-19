@@ -89,10 +89,10 @@ func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksPara
 		// 构造 JSON 数组字符串 ["user:123"]
 		userJSON := fmt.Sprintf("[%q]", params.UserID)
 
-		// 修正 GORM 写法：使用原生 SQL 字符串来保证 AND ( ... OR ... ) 的逻辑正确性
-		// 逻辑：Assignee 是我 OR (Assignee 为空/NULL AND 我在候选人Users里)
+		// 逻辑：Assignee 是我 OR (Assignee 为空/NULL AND 我在候选人数组里)
+		// 注意：candidates 列是 json 类型，需转为 jsonb 后再使用 @>。
 		db = db.Where(
-			"t.assignee = ? OR ((t.assignee = '' OR t.assignee IS NULL) AND t.candidates->'users' @> ?)",
+			"t.assignee = ? OR ((t.assignee = '' OR t.assignee IS NULL) AND t.candidates::jsonb @> ?::jsonb)",
 			params.UserID,
 			userJSON,
 		)

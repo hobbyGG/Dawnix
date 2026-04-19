@@ -102,6 +102,7 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 
 	processDefinitionSvc := service.NewProcessDefinitionService(processDefinitionRepo, logger, cfg.Biz.Features.EmailService.Enabled)
 	processDefinitionHandler := api.NewProcessDefinitionHandler(processDefinitionSvc, logger)
+	enumHandler := api.NewEnumHandler(cfg.Biz.Features.EmailService.Enabled)
 
 	instanceSvc := service.NewInstanceService(instanceRepo, scheduler, logger)
 	instanceHandler := api.NewInstanceHandler(instanceSvc, logger)
@@ -109,14 +110,13 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 	taskSvc := service.NewTaskService(taskRepo, scheduler, logger, cfg.Biz.Task.DefaultScope)
 	taskHandler := api.NewTaskHandler(taskSvc, logger)
 
-	r := api.NewRouter(processDefinitionHandler, instanceHandler, taskHandler)
-
 	// 允许跨域中间件配置
 	config := cors.DefaultConfig()
 	config.AllowOrigins = cfg.Server.CORS.AllowOrigins
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
-	r.Use(cors.New(config))
+
+	r := api.NewRouter([]gin.HandlerFunc{cors.New(config)}, processDefinitionHandler, enumHandler, instanceHandler, taskHandler)
 
 	app := &App{
 		Server:   r,

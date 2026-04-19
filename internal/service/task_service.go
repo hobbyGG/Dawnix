@@ -38,9 +38,9 @@ func (s *TaskService) ListTasksView(ctx context.Context, params *biz.ListTasksPa
 	}
 	// 根据不同scope做处理
 	switch params.Scope {
-	case "my_todo":
+	case "my_todo", "my_pending", "all_pending":
 		params.Status = domain.TaskStatusPending
-	case "my_completed":
+	case "my_completed", "all_completed":
 		params.Status = domain.TaskStatusApproved
 	default:
 		return nil, 0, fmt.Errorf("unsupported task scope: %s", params.Scope)

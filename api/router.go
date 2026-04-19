@@ -7,8 +7,11 @@ type RouterRegistrar interface {
 	Register(r *gin.RouterGroup)
 }
 
-func NewRouter(registrars ...RouterRegistrar) *gin.Engine {
+func NewRouter(middlewares []gin.HandlerFunc, registrars ...RouterRegistrar) *gin.Engine {
 	r := gin.Default()
+	if len(middlewares) > 0 {
+		r.Use(middlewares...)
+	}
 	apiV1Group := r.Group("api/v1")
 
 	for _, registrar := range registrars {
