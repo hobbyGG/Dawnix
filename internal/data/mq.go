@@ -333,23 +333,3 @@ func marshalDLQPayload(msgID, key string, value []byte, handlerErr error) ([]byt
 		Value:         value,
 	})
 }
-
-type serviceTaskMQImpl struct {
-	mq biz.MQ
-}
-
-func NewServiceTaskMQ(mq biz.MQ) biz.ServiceTaskMQ {
-	return &serviceTaskMQImpl{mq: mq}
-}
-
-func (stmq *serviceTaskMQImpl) ProduceEmailTask(ctx context.Context, emailTaskJSON []byte) error {
-	const (
-		topic = "email_tasks"
-		key   = "email_info"
-	)
-
-	if _, err := stmq.mq.Produce(ctx, topic, key, emailTaskJSON); err != nil {
-		return fmt.Errorf("produce email task failed: %w", err)
-	}
-	return nil
-}

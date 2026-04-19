@@ -1,0 +1,22 @@
+server:
+  http:
+    addr: ":8080"
+  cors:
+    allow_origins:
+      - "http://localhost:5173"
+
+data:
+  database:
+    dsn: "postgres://root:123@localhost:5432/root?sslmode=disable&TimeZone=Asia/Shanghai"
+    max_idle_conns: 10
+    max_open_conns: 100
+    conn_max_lifetime_minutes: 30
+  redis:
+    addr: "127.0.0.1:6379"
+
+biz:
+  task:
+    default_scope: "my_todo"
+  features:
+    email_service:
+      enabled: false

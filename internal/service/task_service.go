@@ -11,13 +11,17 @@ import (
 )
 
 type TaskService struct {
-	repo      biz.TaskRepo
-	scheduler biz.TaskScheduler
-	logger    *zap.Logger
+	repo         biz.TaskRepo
+	scheduler    biz.TaskScheduler
+	logger       *zap.Logger
+	defaultScope string
 }
 
-func NewTaskService(repo biz.TaskRepo, scheduler biz.TaskScheduler, logger *zap.Logger) *TaskService {
-	return &TaskService{repo: repo, scheduler: scheduler, logger: logger}
+func NewTaskService(repo biz.TaskRepo, scheduler biz.TaskScheduler, logger *zap.Logger, defaultScope string) *TaskService {
+	if defaultScope == "" {
+		defaultScope = "my_todo"
+	}
+	return &TaskService{repo: repo, scheduler: scheduler, logger: logger, defaultScope: defaultScope}
 }
 
 func (s *TaskService) GetTaskDetailView(ctx context.Context, taskID int64) (*domain.TaskView, error) {
@@ -29,6 +33,9 @@ func (s *TaskService) GetTaskDetailView(ctx context.Context, taskID int64) (*dom
 }
 
 func (s *TaskService) ListTasksView(ctx context.Context, params *biz.ListTasksParams) ([]*domain.TaskView, int64, error) {
+	if params.Scope == "" {
+		params.Scope = s.defaultScope
+	}
 	// 根据不同scope做处理
 	switch params.Scope {
 	case "my_todo":

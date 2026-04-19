@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hobbyGG/Dawnix/api"
 	"github.com/hobbyGG/Dawnix/internal/biz"
+	"github.com/hobbyGG/Dawnix/internal/conf"
 	"github.com/hobbyGG/Dawnix/internal/data"
 	dataModel "github.com/hobbyGG/Dawnix/internal/data/model"
 	"github.com/hobbyGG/Dawnix/internal/service"
@@ -20,18 +21,24 @@ import (
 )
 
 type App struct {
-	Server  *gin.Engine
-	Cleanup func()
+	Server   *gin.Engine
+	HTTPAddr string
+	Cleanup  func()
 }
 
 func (a *App) Run() error {
-	// 默认8080端口
-	return a.Server.Run(":8080")
+	if a.HTTPAddr == "" {
+		a.HTTPAddr = ":8080"
+	}
+	return a.Server.Run(a.HTTPAddr)
 }
 
-func NewAppManual(logger *zap.Logger) (*App, error) {
+func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
 	// 数据库初始化化
-	db, err := gorm.Open(postgres.Open("host=localhost user=root password=123 dbname=root port=5432 sslmode=disable TimeZone=Asia/Shanghai"), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(cfg.Data.Database.DSN), &gorm.Config{
 		NamingStrategy:                           schema.NamingStrategy{SingularTable: true, TablePrefix: "dawnix_"},
 		PrepareStmt:                              true,
 		SkipDefaultTransaction:                   true,
@@ -41,9 +48,9 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 		return nil, fmt.Errorf("fail to initialize postgresSQL: %w", err)
 	}
 	sqlDB, _ := db.DB()
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetMaxIdleConns(cfg.Data.Database.MaxIdleConns)
+	sqlDB.SetMaxOpenConns(cfg.Data.Database.MaxOpenConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.Data.Database.ConnMaxLifetime) * time.Minute)
 	db.AutoMigrate(
 		&dataModel.ProcessDefinition{},
 		&dataModel.ProcessTask{},
@@ -53,7 +60,7 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 
 	// rdb 初始化
 	redOpts := &redis.Options{
-		Addr: "127.0.0.1:16379",
+		Addr: cfg.Data.Redis.Addr,
 	}
 	rdb := redis.NewClient(redOpts)
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
@@ -78,6 +85,8 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 		InstanceRepo:  instanceRepo,
 		ExecutionRepo: executionRepo,
 		ServiceTaskMQ: data.NewServiceTaskMQ(mq),
+	}, biz.NodeFeatures{
+		EmailServiceEnabled: cfg.Biz.Features.EmailService.Enabled,
 	})
 
 	// scheduler初始化
@@ -91,27 +100,28 @@ func NewAppManual(logger *zap.Logger) (*App, error) {
 		nodeRegistry,
 	)
 
-	processDefinitionSvc := service.NewProcessDefinitionService(processDefinitionRepo, logger)
+	processDefinitionSvc := service.NewProcessDefinitionService(processDefinitionRepo, logger, cfg.Biz.Features.EmailService.Enabled)
 	processDefinitionHandler := api.NewProcessDefinitionHandler(processDefinitionSvc, logger)
 
 	instanceSvc := service.NewInstanceService(instanceRepo, scheduler, logger)
 	instanceHandler := api.NewInstanceHandler(instanceSvc, logger)
 
-	taskSvc := service.NewTaskService(taskRepo, scheduler, logger)
+	taskSvc := service.NewTaskService(taskRepo, scheduler, logger, cfg.Biz.Task.DefaultScope)
 	taskHandler := api.NewTaskHandler(taskSvc, logger)
 
 	r := api.NewRouter(processDefinitionHandler, instanceHandler, taskHandler)
 
 	// 允许跨域中间件配置
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:5173"} // 前端地址
+	config.AllowOrigins = cfg.Server.CORS.AllowOrigins
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	r.Use(cors.New(config))
 
 	app := &App{
-		Server:  r,
-		Cleanup: cleanup,
+		Server:   r,
+		HTTPAddr: cfg.Server.HTTP.Addr,
+		Cleanup:  cleanup,
 	}
 	return app, nil
 }

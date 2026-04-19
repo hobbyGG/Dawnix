@@ -25,8 +25,12 @@ type NodeDeps struct {
 	ServiceTaskMQ ServiceTaskMQ
 }
 
-func NewDefaultNodeRegistry(deps NodeDeps) NodeRegistry {
-	return NodeRegistry{
+type NodeFeatures struct {
+	EmailServiceEnabled bool
+}
+
+func NewDefaultNodeRegistry(deps NodeDeps, features NodeFeatures) NodeRegistry {
+	registry := NodeRegistry{
 		domain.NodeTypeStart: func(node *domain.NodeModel) (Node, error) {
 			return newStartNode(node)
 		},
@@ -35,9 +39,6 @@ func NewDefaultNodeRegistry(deps NodeDeps) NodeRegistry {
 		},
 		domain.NodeTypeEnd: func(node *domain.NodeModel) (Node, error) {
 			return newEndNode(node, deps.ExecutionRepo, deps.InstanceRepo)
-		},
-		domain.NodeTypeEmailService: func(node *domain.NodeModel) (Node, error) {
-			return newEmailServiceNode(node, deps.ServiceTaskMQ)
 		},
 		domain.NodeTypeForkGateway: func(node *domain.NodeModel) (Node, error) {
 			return newForkGatewayNode(node, deps.TaskRepo)
@@ -52,6 +53,12 @@ func NewDefaultNodeRegistry(deps NodeDeps) NodeRegistry {
 			return newInclusiveGatewayNode(node, deps.TaskRepo)
 		},
 	}
+	if features.EmailServiceEnabled {
+		registry[domain.NodeTypeEmailService] = func(node *domain.NodeModel) (Node, error) {
+			return newEmailServiceNode(node, deps.ServiceTaskMQ)
+		}
+	}
+	return registry
 }
 
 func buildNodeFromRegistry(registry NodeRegistry, nodeModel *domain.NodeModel) (Node, error) {

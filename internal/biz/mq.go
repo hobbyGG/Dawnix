@@ -2,6 +2,12 @@ package biz
 
 import "context"
 
+const (
+	EmailTaskTopic = "email_tasks"
+	EmailTaskGroup = "email_task_group"
+	EmailTaskKey   = "email_info"
+)
+
 // MQ 定义消息队列端口。
 // biz 层仅依赖行为，不承载具体中间件实现。
 type MQ interface {

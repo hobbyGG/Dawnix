@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/mail"
+	"strings"
 
 	"github.com/hobbyGG/Dawnix/internal/biz"
 	"github.com/hobbyGG/Dawnix/internal/domain"
@@ -11,14 +13,16 @@ import (
 )
 
 type ProcessDefinitionService struct {
-	repo   biz.ProcessDefinitionRepo
-	logger *zap.Logger
+	repo                biz.ProcessDefinitionRepo
+	logger              *zap.Logger
+	emailServiceEnabled bool
 }
 
-func NewProcessDefinitionService(repo biz.ProcessDefinitionRepo, logger *zap.Logger) *ProcessDefinitionService {
+func NewProcessDefinitionService(repo biz.ProcessDefinitionRepo, logger *zap.Logger, emailServiceEnabled bool) *ProcessDefinitionService {
 	return &ProcessDefinitionService{
-		repo:   repo,
-		logger: logger,
+		repo:                repo,
+		logger:              logger,
+		emailServiceEnabled: emailServiceEnabled,
 	}
 }
 
@@ -47,10 +51,16 @@ func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, pa
 
 	for _, node := range params.Structure.Nodes {
 		if node.Type == domain.NodeTypeEmailService {
+			if !s.emailServiceEnabled {
+				return 0, fmt.Errorf("email service node is disabled")
+			}
 			// 验证参数
 			var emailParams domain.EmailNodeParams
 			if err := json.Unmarshal(node.Properties, &emailParams); err != nil {
 				return 0, fmt.Errorf("fail to unmarshal email service properties: %w", err)
+			}
+			if err := validateEmailNodeParams(emailParams); err != nil {
+				return 0, fmt.Errorf("invalid email service properties: %w", err)
 			}
 		}
 	}
@@ -80,6 +90,22 @@ func validateFormDefinition(items []biz.FormDataItem) error {
 		if !json.Valid(item.Value) {
 			return fmt.Errorf("item[%d].value must be valid json", i)
 		}
+	}
+	return nil
+}
+
+func validateEmailNodeParams(params domain.EmailNodeParams) error {
+	if strings.TrimSpace(params.To) == "" {
+		return fmt.Errorf("to is required")
+	}
+	if _, err := mail.ParseAddress(params.To); err != nil {
+		return fmt.Errorf("invalid to address: %w", err)
+	}
+	if strings.TrimSpace(params.Subject) == "" {
+		return fmt.Errorf("subject is required")
+	}
+	if strings.TrimSpace(params.Body) == "" {
+		return fmt.Errorf("body is required")
 	}
 	return nil
 }

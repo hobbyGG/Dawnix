@@ -8,59 +8,36 @@ import (
 	"strings"
 
 	"github.com/hobbyGG/Dawnix/client"
+	"github.com/hobbyGG/Dawnix/internal/conf"
 	"github.com/hobbyGG/Dawnix/internal/data"
 	"github.com/hobbyGG/Dawnix/worker"
 	"github.com/redis/go-redis/v9"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
 )
 
 func main() {
-	// 加载配置文件
-	viper.SetConfigName("local")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("..")
-	viper.AddConfigPath("../..")
-	viper.SetConfigType("env")
-	viper.AutomaticEnv()
-	if err := viper.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &notFound) {
-			panic(err)
-		}
-	}
-	smtpToken := viper.GetString("SMTP_TOKEN")
-	if smtpToken == "" {
-		panic("SMTP_TOKEN not found in config")
+	cfg, err := LoadBootstrapConfig()
+	if err != nil {
+		panic(err)
 	}
 
 	// zap日志库初始化
 	logger := NewLogger()
 	defer logger.Sync()
 
-	// 启动 worker
-	workerConfig := &workerConfig{
-		SMTPToken: smtpToken,
-		Email:     viper.GetString("SMTP_EMAIL"),
-		RedisAddr: viper.GetString("REDIS_ADDR"),
-	}
-	if workerConfig.Email == "" {
-		workerConfig.Email = "1056652209@qq.com"
-	}
-	if workerConfig.RedisAddr == "" {
-		workerConfig.RedisAddr = "127.0.0.1:16379"
-	}
-
-	eSendWorker, err := InitWorker(workerConfig)
+	// 启动 worker（邮件特性关闭时不启动）
+	eSendWorker, err := InitWorker(cfg)
 	if err != nil {
 		panic(err)
 	}
-	defer eSendWorker.Stop()
+	if eSendWorker != nil {
+		defer eSendWorker.Stop()
+	}
 
 	// 创建并运行应用程序
-	serverApp, err := NewAppManual(logger)
+	serverApp, err := NewAppManual(logger, cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -75,25 +52,29 @@ func main() {
 	}
 }
 
-type workerConfig struct {
-	SMTPToken string
-	Email     string
-	RedisAddr string
-}
-
-func InitWorker(c *workerConfig) (*worker.EmailSendWorker, error) {
+func InitWorker(cfg *conf.Bootstrap) (*worker.EmailSendWorker, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	if !cfg.Biz.Features.EmailService.Enabled {
+		return nil, nil
+	}
 	redisOpts := &redis.Options{
-		Addr: c.RedisAddr,
+		Addr: cfg.Worker.RedisAddr,
 	}
 	rdb := redis.NewClient(redisOpts)
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
 		return nil, fmt.Errorf("init worker redis failed: %w", err)
 	}
 
-	ecli := client.NewEmailClient(c.SMTPToken, c.Email)
+	ecli := client.NewEmailClient(cfg.Worker.SMTPToken, cfg.Worker.SMTPEmail)
 	mq := data.NewRedisMQ(rdb)
 	eSendWorker := worker.NewEmailSender(ecli, mq)
-	go eSendWorker.Start(context.Background())
+	go func() {
+		if err := eSendWorker.Start(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
+			zap.L().Fatal("email send worker exited unexpectedly", zap.Error(err))
+		}
+	}()
 
 	return eSendWorker, nil
 }
