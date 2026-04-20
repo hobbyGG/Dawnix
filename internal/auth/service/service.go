@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -68,15 +67,16 @@ func (s *Service) Register(ctx context.Context, params *RegisterParams) (*Regist
 	if params == nil {
 		return nil, fmt.Errorf("register params is nil")
 	}
-	username := strings.TrimSpace(params.Username)
-	if username == "" || strings.TrimSpace(params.Password) == "" {
+	username := params.Username
+	if username == "" || params.Password == "" {
 		return nil, fmt.Errorf("username and password are required")
 	}
-	displayName := strings.TrimSpace(params.DisplayName)
+	displayName := params.DisplayName
 	if displayName == "" {
 		displayName = username
 	}
 
+	// 检查该 provider 下是否已经有相同用户名的账号存在
 	_, err := s.repo.GetIdentityByProviderAndSub(ctx, authBiz.ProviderLocalPassword, username)
 	if err == nil {
 		return nil, ErrUsernameAlreadyExists
@@ -85,6 +85,7 @@ func (s *Service) Register(ctx context.Context, params *RegisterParams) (*Regist
 		return nil, fmt.Errorf("check username existence failed: %w", err)
 	}
 
+	// 对密码进行加密
 	credentialHash, err := bcrypt.GenerateFromPassword([]byte(params.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("hash password failed: %w", err)

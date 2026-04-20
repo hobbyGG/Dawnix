@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/mail"
-	"strings"
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
@@ -77,37 +76,23 @@ func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, pa
 }
 
 func validateFormDefinition(items []biz.FormDataItem) error {
-	for i, item := range items {
-		if item.ID == "" {
-			return fmt.Errorf("item[%d].id is required", i)
-		}
-		if item.Label == "" {
-			return fmt.Errorf("item[%d].label is required", i)
-		}
-		if item.Type == "" {
-			return fmt.Errorf("item[%d].type is required", i)
-		}
-		if len(item.Value) == 0 {
-			return fmt.Errorf("item[%d].value is required", i)
-		}
-		if !json.Valid(item.Value) {
-			return fmt.Errorf("item[%d].value must be valid json", i)
-		}
+	if err := biz.ValidateFormDataItems(items, biz.FormValidationModeDefinition); err != nil {
+		return err
 	}
 	return nil
 }
 
 func validateEmailNodeParams(params domain.EmailNodeParams) error {
-	if strings.TrimSpace(params.To) == "" {
+	if params.To == "" {
 		return fmt.Errorf("to is required")
 	}
 	if _, err := mail.ParseAddress(params.To); err != nil {
 		return fmt.Errorf("invalid to address: %w", err)
 	}
-	if strings.TrimSpace(params.Subject) == "" {
+	if params.Subject == "" {
 		return fmt.Errorf("subject is required")
 	}
-	if strings.TrimSpace(params.Body) == "" {
+	if params.Body == "" {
 		return fmt.Errorf("body is required")
 	}
 	return nil

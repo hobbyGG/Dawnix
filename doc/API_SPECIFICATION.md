@@ -274,8 +274,8 @@
 | form_definition | array | 否 | 表单定义项 |
 | form_definition[].id | string | 是 | 表单字段唯一ID |
 | form_definition[].label | string | 是 | 表单字段展示名，作为运行时变量名 |
-| form_definition[].type | string | 是 | 字段类型: string, number, boolean, etc. |
-| form_definition[].value | any | 否 | 字段默认值 |
+| form_definition[].type | string | 是 | 字段类型：text_single_line, number, single_select, date |
+| form_definition[].value | any | 否 | 字段默认值（可选） |
 
 **响应体**:
 ```json
@@ -468,10 +468,12 @@ DELETE /api/v1/definition/1
 | form_data | array | 否 | 业务表单数据 |
 | form_data[].id | string | 是 | 字段唯一ID |
 | form_data[].label | string | 是 | 字段展示名，作为运行时变量名 |
-| form_data[].type | string | 是 | 字段类型 |
+| form_data[].type | string | 是 | 字段类型（需与 form_definition 对应字段一致） |
 | form_data[].value | any | 是 | 字段值 |
 | parent_id | int64 | 否 | 父流程实例ID (子流程场景) |
 | parent_node_id | string | 否 | 父流程节点ID (子流程场景) |
+
+> 说明：`form_data` 中不允许提交未在 `form_definition` 声明的字段，命中会返回错误。
 
 **响应体**:
 ```json
@@ -805,8 +807,10 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
 | form_data | array | 否 | 提交的表单数据 |
 | form_data[].id | string | 是 | 字段唯一ID |
 | form_data[].label | string | 是 | 字段展示名，作为运行时变量名 |
-| form_data[].type | string | 是 | 字段类型 |
+| form_data[].type | string | 是 | 字段类型（需与 form_definition 对应字段一致） |
 | form_data[].value | any | 是 | 字段值 |
+
+> 说明：`form_data` 中不允许提交未在 `form_definition` 声明的字段，命中会返回错误。
 
 **响应体**:
 ```json
@@ -841,14 +845,13 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
 }
 ```
 
-支持的字段类型:
-- `string`: 字符串
+支持的字段类型（当前版本）:
+- `text_single_line`: 单行文本
 - `number`: 数字
-- `boolean`: 布尔值
-- `date`: 日期
-- `datetime`: 日期时间
-- `array`: 数组
-- `object`: 对象
+- `single_select`: 单选/下拉
+- `date`: 日期（RFC3339 字符串）
+
+当前版本暂不支持：联系人（成员选择器）、附件、图片等复杂类型。
 
 ### Candidates (候选人)
 

@@ -70,6 +70,14 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, params *StartProce
 			return fmt.Errorf("start node %s has no outgoing edge", runtimeGraph.StartNode.ID())
 		}
 
+		definitionItems, err := DecodeFormDataItems(processDef.FormDefinition)
+		if err != nil {
+			return fmt.Errorf("decode form_definition failed: %w", err)
+		}
+		if err := ValidateRuntimeFormDataAgainstDefinition(definitionItems, params.FormData); err != nil {
+			return fmt.Errorf("invalid form_data: %w", err)
+		}
+
 		formData, err := json.Marshal(params.FormData)
 		if err != nil {
 			return fmt.Errorf("form_data marshal failed: %w", err)
@@ -146,6 +154,21 @@ func (s *Scheduler) CompleteTask(ctx context.Context, task *domain.ProcessTask) 
 		inst, err := s.instanceRepo.GetByID(ctx, task.InstanceID)
 		if err != nil {
 			return fmt.Errorf("failed to get instance by id: %w", err)
+		}
+		processDef, err := s.definitionRepo.GetByID(ctx, inst.DefinitionID)
+		if err != nil {
+			return fmt.Errorf("failed to get definition by id: %w", err)
+		}
+		definitionItems, err := DecodeFormDataItems(processDef.FormDefinition)
+		if err != nil {
+			return fmt.Errorf("decode form_definition failed: %w", err)
+		}
+		taskItems, err := DecodeFormDataItems(task.FormData)
+		if err != nil {
+			return fmt.Errorf("decode task form_data failed: %w", err)
+		}
+		if err := ValidateRuntimeFormDataAgainstDefinition(definitionItems, taskItems); err != nil {
+			return fmt.Errorf("invalid task form_data: %w", err)
 		}
 		if err := s.mergeInstanceFormData(ctx, inst, task.FormData); err != nil {
 			return err
