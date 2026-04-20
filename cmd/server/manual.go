@@ -8,11 +8,16 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/hobbyGG/Dawnix/api"
-	"github.com/hobbyGG/Dawnix/internal/biz"
-	"github.com/hobbyGG/Dawnix/internal/conf"
-	"github.com/hobbyGG/Dawnix/internal/data"
-	dataModel "github.com/hobbyGG/Dawnix/internal/data/model"
-	"github.com/hobbyGG/Dawnix/internal/service"
+	authAPI "github.com/hobbyGG/Dawnix/api/auth"
+	"github.com/hobbyGG/Dawnix/api/workflow"
+	authData "github.com/hobbyGG/Dawnix/internal/auth/data"
+	authModel "github.com/hobbyGG/Dawnix/internal/auth/data/model"
+	authService "github.com/hobbyGG/Dawnix/internal/auth/service"
+	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
+	"github.com/hobbyGG/Dawnix/internal/workflow/conf"
+	"github.com/hobbyGG/Dawnix/internal/workflow/data"
+	dataModel "github.com/hobbyGG/Dawnix/internal/workflow/data/model"
+	"github.com/hobbyGG/Dawnix/internal/workflow/service"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -56,6 +61,8 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 		&dataModel.ProcessTask{},
 		&dataModel.ProcessInstance{},
 		&dataModel.Execution{},
+		&authModel.User{},
+		&authModel.AuthIdentity{},
 	)
 
 	// rdb 初始化
@@ -101,14 +108,22 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 	)
 
 	processDefinitionSvc := service.NewProcessDefinitionService(processDefinitionRepo, logger, cfg.Biz.Features.EmailService.Enabled)
-	processDefinitionHandler := api.NewProcessDefinitionHandler(processDefinitionSvc, logger)
-	enumHandler := api.NewEnumHandler(cfg.Biz.Features.EmailService.Enabled)
+	processDefinitionHandler := workflow.NewProcessDefinitionHandler(processDefinitionSvc, logger)
+	enumHandler := workflow.NewEnumHandler(cfg.Biz.Features.EmailService.Enabled)
 
 	instanceSvc := service.NewInstanceService(instanceRepo, scheduler, logger)
-	instanceHandler := api.NewInstanceHandler(instanceSvc, logger)
+	instanceHandler := workflow.NewInstanceHandler(instanceSvc, logger)
 
 	taskSvc := service.NewTaskService(taskRepo, scheduler, logger, cfg.Biz.Task.DefaultScope)
-	taskHandler := api.NewTaskHandler(taskSvc, logger)
+	taskHandler := workflow.NewTaskHandler(taskSvc, logger)
+	authRepo := authData.NewRepo(dataObj)
+	authSvc := authService.NewService(authRepo, authService.Config{
+		JWTSecret:        cfg.Auth.JWT.Secret,
+		JWTIssuer:        cfg.Auth.JWT.Issuer,
+		JWTExpireMinutes: cfg.Auth.JWT.ExpireMinutes,
+	}, logger)
+	authHandler := authAPI.NewHandler(authSvc, logger)
+	authMiddleware := authService.JWTMiddleware(authSvc)
 
 	// 允许跨域中间件配置
 	config := cors.DefaultConfig()
@@ -116,7 +131,14 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 
-	r := api.NewRouter([]gin.HandlerFunc{cors.New(config)}, processDefinitionHandler, enumHandler, instanceHandler, taskHandler)
+	r := api.NewRouter(
+		[]gin.HandlerFunc{cors.New(config), authMiddleware},
+		authHandler,
+		processDefinitionHandler,
+		enumHandler,
+		instanceHandler,
+		taskHandler,
+	)
 
 	app := &App{
 		Server:   r,

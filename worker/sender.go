@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/hobbyGG/Dawnix/client"
-	"github.com/hobbyGG/Dawnix/internal/biz"
-	"github.com/hobbyGG/Dawnix/internal/domain"
+	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
+	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 	"github.com/hobbyGG/Dawnix/util"
 	"go.uber.org/zap"
 )

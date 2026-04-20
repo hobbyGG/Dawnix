@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hobbyGG/Dawnix/internal/conf"
+	"github.com/hobbyGG/Dawnix/internal/workflow/conf"
 	"github.com/spf13/viper"
 )
 

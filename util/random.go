@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hobbyGG/Dawnix/internal/domain"
+	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 	"gorm.io/datatypes"
 )
 

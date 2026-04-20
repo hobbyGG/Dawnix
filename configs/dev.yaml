@@ -20,3 +20,9 @@ biz:
   features:
     email_service:
       enabled: false
+
+auth:
+  jwt:
+    secret: "dawnix-dev-jwt-secret"
+    issuer: "dawnix"
+    expire_minutes: 120

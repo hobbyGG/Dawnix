@@ -8,9 +8,62 @@
 
 **API 基础URL**: `http://localhost:8080/api/v1`
 
+**鉴权方式**: Bearer Token（JWT）
+
+> 认证能力遵循 KISS：当前仅提供登录和登出接口。
+
 ---
 
-## 0. 枚举接口 (Enum)
+## 0. 认证接口 (Auth)
+
+### 0.1 登录
+
+**接口**: `POST /api/v1/auth/login`
+
+**功能**: 使用本地账号密码登录，签发访问令牌。
+
+**请求体**:
+```json
+{
+  "username": "admin",
+  "password": "password"
+}
+```
+
+**响应体**:
+```json
+{
+  "access_token": "<jwt_token>",
+  "token_type": "Bearer",
+  "expires_at": "2026-04-20T12:00:00Z"
+}
+```
+
+**状态码**:
+- `200`: 登录成功
+- `400`: 请求参数错误
+- `401`: 用户名或密码错误
+
+### 0.2 登出
+
+**接口**: `POST /api/v1/auth/logout`
+
+**功能**: 登出接口（当前为无状态退出，服务端返回成功后由客户端清理 token）。
+
+**响应体**:
+```json
+{
+  "status": "success"
+}
+```
+
+**状态码**:
+- `200`: 登出成功
+- `401`: 未登录或 token 无效
+
+---
+
+## 1. 枚举接口 (Enum)
 
 用于给前端提供下拉选项。当前先提供节点类型枚举，返回中文展示名和后端英文值。
 邮件服务节点是否返回，取决于后端是否开启邮件服务特性。
@@ -77,7 +130,7 @@
 
 ---
 
-## 1. 流程定义管理接口 (Definition)
+## 2. 流程定义管理接口 (Definition)
 
 流程定义是工作流的模板，包含流程的结构、节点、连线等信息。
 
@@ -329,7 +382,7 @@ DELETE /api/v1/definition/1
 
 ---
 
-## 2. 流程实例管理接口 (Instance)
+## 3. 流程实例管理接口 (Instance)
 
 流程实例是基于流程定义创建的具体执行实例，代表一个具体的工作流执行过程。
 
@@ -343,7 +396,7 @@ DELETE /api/v1/definition/1
 ```json
 {
   "process_code": "leave_request",
-  "submitter_id": "user_123",
+  "submitter_id": "u_admin",
   "form_data": [
     {
       "key": "days",
@@ -366,7 +419,7 @@ DELETE /api/v1/definition/1
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | process_code | string | 是 | 流程代码，对应ProcessDefinition的code字段 |
-| submitter_id | string | 是 | 发起人ID |
+| submitter_id | string | 否 | 发起人ID；已登录时以后端 token 注入为准 |
 | form_data | array | 否 | 业务表单数据 |
 | form_data[].key | string | 是 | 字段key |
 | form_data[].type | string | 是 | 字段类型 |
@@ -539,7 +592,7 @@ DELETE /api/v1/instance/100
 
 ---
 
-## 3. 任务管理接口 (Task)
+## 4. 任务管理接口 (Task)
 
 任务是在流程实例执行过程中产生的具体工作项，需要分配给用户进行处理。
 
@@ -791,8 +844,35 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
 常见HTTP状态码:
 - `200`: 请求成功
 - `400`: 请求参数错误或验证失败
+- `401`: 未认证或令牌无效
 - `404`: 资源不存在
 - `500`: 服务器内部错误
+
+---
+
+## 身份字段迁移说明
+
+为保持 Auth 与 Workflow 一致性，系统内用户身份字段统一为 `string`。
+
+### 统一约束
+
+- `submitter_id` 使用 string
+- 任务 `assignee` 使用 string
+- 任务 `candidates` 数组成员使用 string
+- JWT `sub` 与内部 `uid` 使用 string
+- `user_id` 作为 Auth 主身份键，使用 string
+
+### 兼容策略
+
+- 历史整型身份值在迁移时转为字符串存储
+- 业务层不再接收 `int64` 用户身份字段
+- 新接口与中间件仅向下游传递 string 类型身份
+
+### 迁移建议顺序
+
+1. 先做数据库列类型与数据转换
+2. 再切换应用层 DTO 和领域模型
+3. 最后清理遗留整型身份字段
 
 ---
 
@@ -805,9 +885,13 @@ const API_BASE = 'http://localhost:8080/api/v1';
 
 const request = async (method, path, data = null) => {
   const url = `${API_BASE}${path}`;
+  const token = localStorage.getItem('access_token');
   const options = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   };
   
   if (data) {
@@ -825,10 +909,16 @@ const request = async (method, path, data = null) => {
 // 获取流程定义列表
 const definitions = await request('GET', '/definition/list?page=1&size=10');
 
+// 登录（成功后保存 access_token）
+const loginResp = await request('POST', '/auth/login', {
+  username: 'admin',
+  password: 'password'
+});
+localStorage.setItem('access_token', loginResp.access_token);
+
 // 创建流程实例
 const instance = await request('POST', '/instance/create', {
   process_code: 'leave_request',
-  submitter_id: 'user_123',
   form_data: [...]
 });
 
@@ -853,8 +943,35 @@ await request('POST', `/task/complete/${taskId}`, {
 
 ---
 
+## 联调清单 (KISS)
+
+### 1. 登录获取 Token
+
+1. 调用 `POST /api/v1/auth/login`
+2. 保存 `access_token`
+3. 后续请求统一携带 `Authorization: Bearer <token>`
+
+### 2. 访问受保护接口
+
+1. 使用 token 调用 `GET /api/v1/task/list`
+2. 使用 token 调用 `POST /api/v1/instance/create`
+3. 校验后端以 token 中用户身份写入 `submitter_id`
+
+### 3. 未登录校验
+
+1. 不带 token 调用 `GET /api/v1/task/list`
+2. 预期返回 `401`
+
+### 4. 登出
+
+1. 调用 `POST /api/v1/auth/logout`
+2. 客户端清理本地 token
+3. 清理后再次访问受保护接口应返回 `401`
+
+---
+
 ## 版本信息
 
 - API 版本: v1
-- 最后更新: 2026-04-19
+- 最后更新: 2026-04-20
 - 维护者: Dawnix Team

@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/hobbyGG/Dawnix/client"
-	"github.com/hobbyGG/Dawnix/internal/conf"
-	"github.com/hobbyGG/Dawnix/internal/data"
+	"github.com/hobbyGG/Dawnix/internal/workflow/conf"
+	"github.com/hobbyGG/Dawnix/internal/workflow/data"
 	"github.com/hobbyGG/Dawnix/worker"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
