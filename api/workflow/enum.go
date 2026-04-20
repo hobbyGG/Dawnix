@@ -18,6 +18,7 @@ func NewEnumHandler(emailServiceEnabled bool) *EnumHandler {
 func (h *EnumHandler) Register(rg *gin.RouterGroup) {
 	r := rg.Group("enum")
 	r.GET("node-types", h.NodeTypes)
+	r.GET("form-types", h.FormTypes)
 }
 
 func (h *EnumHandler) NodeTypes(c *gin.Context) {
@@ -32,6 +33,16 @@ func (h *EnumHandler) NodeTypes(c *gin.Context) {
 	}
 	if h.emailServiceEnabled {
 		items = append(items, EnumItem{Label: "邮件服务节点", Value: domain.NodeTypeEmailService})
+	}
+	c.JSON(http.StatusOK, gin.H{"list": items})
+}
+
+func (h *EnumHandler) FormTypes(c *gin.Context) {
+	items := []EnumItem{
+		{Label: "单行文本", Value: domain.FormTypeTextSingleLine},
+		{Label: "数字", Value: domain.FormTypeNumber},
+		{Label: "单选/下拉", Value: domain.FormTypeSingleSelect},
+		{Label: "日期", Value: domain.FormTypeDate},
 	}
 	c.JSON(http.StatusOK, gin.H{"list": items})
 }

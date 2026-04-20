@@ -77,6 +77,7 @@ func (s *Service) Register(ctx context.Context, params *RegisterParams) (*Regist
 		displayName = username
 	}
 
+	// 检查该 provider 下是否已经有相同用户名的账号存在
 	_, err := s.repo.GetIdentityByProviderAndSub(ctx, authBiz.ProviderLocalPassword, username)
 	if err == nil {
 		return nil, ErrUsernameAlreadyExists
@@ -85,6 +86,7 @@ func (s *Service) Register(ctx context.Context, params *RegisterParams) (*Regist
 		return nil, fmt.Errorf("check username existence failed: %w", err)
 	}
 
+	// 对密码进行加密
 	credentialHash, err := bcrypt.GenerateFromPassword([]byte(params.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("hash password failed: %w", err)

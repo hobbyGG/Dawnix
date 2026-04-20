@@ -1,8 +1,11 @@
 package biz
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 )
@@ -24,16 +27,170 @@ type FormDataItem struct {
 	Type  string          `json:"type"`
 }
 
+type FormValidationMode string
+
+const (
+	FormValidationModeDefinition FormValidationMode = "definition"
+	FormValidationModeRuntime    FormValidationMode = "runtime"
+)
+
+var formTypeAliasToCanonical = map[string]string{
+	"text_single_line": domain.FormTypeTextSingleLine,
+	"single_line_text": domain.FormTypeTextSingleLine,
+	"text":             domain.FormTypeTextSingleLine,
+	"string":           domain.FormTypeTextSingleLine,
+
+	"number": domain.FormTypeNumber,
+
+	"single_select": domain.FormTypeSingleSelect,
+	"select":        domain.FormTypeSingleSelect,
+	"dropdown":      domain.FormTypeSingleSelect,
+	"single_choice": domain.FormTypeSingleSelect,
+
+	"date": domain.FormTypeDate,
+}
+
 func DecodeFormDataItems(payload []byte) ([]FormDataItem, error) {
-	if len(payload) == 0 {
+	trimmed := bytes.TrimSpace(payload)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) || bytes.Equal(trimmed, []byte("{}")) {
 		return []FormDataItem{}, nil
 	}
 
 	var items []FormDataItem
-	if err := json.Unmarshal(payload, &items); err != nil {
+	if err := json.Unmarshal(trimmed, &items); err != nil {
 		return nil, fmt.Errorf("unmarshal form data items failed: %w", err)
 	}
 	return items, nil
+}
+
+func ValidateFormDataItems(items []FormDataItem, mode FormValidationMode) error {
+	seenIdentity := make(map[string]struct{}, len(items))
+	for i, item := range items {
+		ref := formItemRef(item, i)
+
+		if item.ID == "" {
+			return fmt.Errorf("%s id is required", ref)
+		}
+		if item.Label == "" {
+			return fmt.Errorf("%s label is required", ref)
+		}
+		if item.Type == "" {
+			return fmt.Errorf("%s type is required", ref)
+		}
+
+		canonicalType, err := normalizeFormType(item.Type)
+		if err != nil {
+			return fmt.Errorf("%s type is invalid: %w", ref, err)
+		}
+
+		identity := formItemIdentity(item)
+		if _, exists := seenIdentity[identity]; exists {
+			return fmt.Errorf("%s duplicated identity: %s", ref, identity)
+		}
+		seenIdentity[identity] = struct{}{}
+
+		if len(item.Value) == 0 {
+			if mode == FormValidationModeRuntime {
+				return fmt.Errorf("%s value is required", ref)
+			}
+			continue
+		}
+		if !json.Valid(item.Value) {
+			return fmt.Errorf("%s value must be valid json", ref)
+		}
+
+		if err := ValidateFormValueByType(canonicalType, item.Value); err != nil {
+			return fmt.Errorf("%s value is invalid for type %s: %w", ref, canonicalType, err)
+		}
+	}
+	return nil
+}
+
+func ValidateRuntimeFormDataAgainstDefinition(definitionItems []FormDataItem, runtimeItems []FormDataItem) error {
+	if err := ValidateFormDataItems(definitionItems, FormValidationModeDefinition); err != nil {
+		return fmt.Errorf("invalid form_definition: %w", err)
+	}
+	if err := ValidateFormDataItems(runtimeItems, FormValidationModeRuntime); err != nil {
+		return fmt.Errorf("invalid form_data payload: %w", err)
+	}
+
+	definitionByID := make(map[string]FormDataItem, len(definitionItems))
+	definitionByLabel := make(map[string]FormDataItem, len(definitionItems))
+	for _, item := range definitionItems {
+		definitionByID[item.ID] = item
+		definitionByLabel[item.Label] = item
+	}
+
+	for i, runtimeItem := range runtimeItems {
+		ref := formItemRef(runtimeItem, i)
+		definitionItem, ok := definitionByID[runtimeItem.ID]
+		if !ok {
+			definitionItem, ok = definitionByLabel[runtimeItem.Label]
+		}
+		if !ok {
+			return fmt.Errorf("%s is not declared in form_definition", ref)
+		}
+
+		if runtimeItem.ID != definitionItem.ID {
+			return fmt.Errorf("%s id does not match form_definition id %s", ref, definitionItem.ID)
+		}
+		if runtimeItem.Label != definitionItem.Label {
+			return fmt.Errorf("%s label does not match form_definition label %s", ref, definitionItem.Label)
+		}
+
+		runtimeType, err := normalizeFormType(runtimeItem.Type)
+		if err != nil {
+			return fmt.Errorf("%s type is invalid: %w", ref, err)
+		}
+		definitionType, err := normalizeFormType(definitionItem.Type)
+		if err != nil {
+			return fmt.Errorf("form_definition item %s has invalid type: %w", definitionItem.ID, err)
+		}
+		if runtimeType != definitionType {
+			return fmt.Errorf("%s type %s does not match form_definition type %s", ref, runtimeItem.Type, definitionItem.Type)
+		}
+	}
+
+	return nil
+}
+
+func ValidateFormValueByType(typ string, raw json.RawMessage) error {
+	switch typ {
+	case domain.FormTypeTextSingleLine:
+		var value string
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return fmt.Errorf("expect string: %w", err)
+		}
+		return nil
+	case domain.FormTypeNumber:
+		var value float64
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return fmt.Errorf("expect number: %w", err)
+		}
+		return nil
+	case domain.FormTypeSingleSelect:
+		var value interface{}
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return fmt.Errorf("expect json primitive: %w", err)
+		}
+		switch value.(type) {
+		case string, float64, bool:
+			return nil
+		default:
+			return fmt.Errorf("expect string/number/boolean")
+		}
+	case domain.FormTypeDate:
+		var value string
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return fmt.Errorf("expect RFC3339 datetime string: %w", err)
+		}
+		if _, err := time.Parse(time.RFC3339, value); err != nil {
+			return fmt.Errorf("expect RFC3339 datetime string: %w", err)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported form type: %s", typ)
+	}
 }
 
 func FormDataItemsToMap(items []FormDataItem) (map[string]interface{}, error) {
@@ -90,6 +247,32 @@ func formItemIdentity(item FormDataItem) string {
 		return item.ID
 	}
 	return item.Label
+}
+
+func formItemRef(item FormDataItem, idx int) string {
+	if item.ID != "" {
+		return fmt.Sprintf("item[%d](id=%s)", idx, item.ID)
+	}
+	if item.Label != "" {
+		return fmt.Sprintf("item[%d](label=%s)", idx, item.Label)
+	}
+	return fmt.Sprintf("item[%d]", idx)
+}
+
+func normalizeFormType(rawType string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(rawType))
+	if normalized == "" {
+		return "", fmt.Errorf("type is empty")
+	}
+	if canonical, ok := formTypeAliasToCanonical[normalized]; ok {
+		return canonical, nil
+	}
+	switch normalized {
+	case "member", "contact", "member_picker", "user", "user_picker", "attachment", "file", "image":
+		return "", fmt.Errorf("form type %s is not supported in current version", rawType)
+	default:
+		return "", fmt.Errorf("unsupported form type: %s", rawType)
+	}
 }
 
 func NewSchedulerRuntimeGraph(graphModel *domain.GraphModel, registry NodeRegistry) (*RuntimeGraph, error) {
