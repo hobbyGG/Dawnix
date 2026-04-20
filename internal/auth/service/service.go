@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -68,11 +67,11 @@ func (s *Service) Register(ctx context.Context, params *RegisterParams) (*Regist
 	if params == nil {
 		return nil, fmt.Errorf("register params is nil")
 	}
-	username := strings.TrimSpace(params.Username)
-	if username == "" || strings.TrimSpace(params.Password) == "" {
+	username := params.Username
+	if username == "" || params.Password == "" {
 		return nil, fmt.Errorf("username and password are required")
 	}
-	displayName := strings.TrimSpace(params.DisplayName)
+	displayName := params.DisplayName
 	if displayName == "" {
 		displayName = username
 	}

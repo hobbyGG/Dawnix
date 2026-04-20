@@ -51,13 +51,12 @@ var formTypeAliasToCanonical = map[string]string{
 }
 
 func DecodeFormDataItems(payload []byte) ([]FormDataItem, error) {
-	trimmed := bytes.TrimSpace(payload)
-	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) || bytes.Equal(trimmed, []byte("{}")) {
+	if len(payload) == 0 || bytes.Equal(payload, []byte("null")) || bytes.Equal(payload, []byte("{}")) {
 		return []FormDataItem{}, nil
 	}
 
 	var items []FormDataItem
-	if err := json.Unmarshal(trimmed, &items); err != nil {
+	if err := json.Unmarshal(payload, &items); err != nil {
 		return nil, fmt.Errorf("unmarshal form data items failed: %w", err)
 	}
 	return items, nil
@@ -260,7 +259,7 @@ func formItemRef(item FormDataItem, idx int) string {
 }
 
 func normalizeFormType(rawType string) (string, error) {
-	normalized := strings.ToLower(strings.TrimSpace(rawType))
+	normalized := strings.ToLower(rawType)
 	if normalized == "" {
 		return "", fmt.Errorf("type is empty")
 	}

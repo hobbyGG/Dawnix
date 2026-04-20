@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/mail"
-	"strings"
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
@@ -27,53 +26,115 @@ func NewProcessDefinitionService(repo biz.ProcessDefinitionRepo, logger *zap.Log
 }
 
 func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, params *biz.ProcessDefinitionCreateParams) (int64, error) {
-	// 这里实现创建流程模板的业务逻辑
-	// 业务校验：流程是否已经存在，唯一字段是否存在冲突
-	if params == nil {
-		return 0, fmt.Errorf("params is nil")
-	}
-	if params.Structure == nil {
-		return 0, fmt.Errorf("structure is nil")
-	}
-
-	if err := validateFormDefinition(params.FormDefinition); err != nil {
-		return 0, fmt.Errorf("invalid form_definition: %w", err)
-	}
-	if err := validateGraphStructure(params.Structure); err != nil {
-		return 0, fmt.Errorf("invalid structure graph: %w", err)
-	}
-	if err := validateXORRoutingRules(params.Structure); err != nil {
-		return 0, fmt.Errorf("invalid structure routing rules: %w", err)
-	}
-	if err := validateInclusiveRoutingRules(params.Structure); err != nil {
-		return 0, fmt.Errorf("invalid structure routing rules: %w", err)
-	}
-
-	for _, node := range params.Structure.Nodes {
-		if node.Type == domain.NodeTypeEmailService {
-			if !s.emailServiceEnabled {
-				return 0, fmt.Errorf("email service node is disabled")
-			}
-			// 验证参数
-			var emailParams domain.EmailNodeParams
-			if err := json.Unmarshal(node.Properties, &emailParams); err != nil {
-				return 0, fmt.Errorf("fail to unmarshal email service properties: %w", err)
-			}
-			if err := validateEmailNodeParams(emailParams); err != nil {
-				return 0, fmt.Errorf("invalid email service properties: %w", err)
-			}
-		}
-	}
-
-	model, err := paramsToProcessDef(params)
+	model, err := s.validateAndBuildModel(params)
 	if err != nil {
-		return 0, fmt.Errorf("convert request to model failed: %w", err)
+		return 0, err
 	}
 	id, err := s.repo.Create(c, model)
 	if err != nil {
 		return 0, fmt.Errorf("create failed: %w", err)
 	}
 	return id, nil
+}
+
+func (s *ProcessDefinitionService) ListProcessDefinitions(ctx context.Context, params *biz.ProcessDefinitionListParams) ([]domain.ProcessDefinition, error) {
+	// 这里实现获取流程模板列表的业务逻辑
+	// 业务校验：分页参数是否合法
+	pdList, err := s.repo.List(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get processDefinition list: %w", err)
+	}
+	return pdList, nil
+}
+
+func (s *ProcessDefinitionService) GetProcessDefinitionDetail(ctx context.Context, id int64) (*domain.ProcessDefinition, error) {
+	// 这里实现获取流程模板详情的业务逻辑
+	pdDetail, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get processDefinition detail: %w", err)
+	}
+	return pdDetail, nil
+}
+
+func (s *ProcessDefinitionService) DeleteProcessDefinition(ctx context.Context, id int64) error {
+	// 这里实现删除流程模板的业务逻辑
+	// 业务校验：流程模板是否存在，是否允许删除等
+
+	s.repo.DeleteByID(ctx, id)
+	return nil
+}
+
+func (s *ProcessDefinitionService) UpdateProcessDefinition(ctx context.Context, id int64, params *biz.ProcessDefinitionCreateParams) error {
+	if id <= 0 {
+		return fmt.Errorf("id is invalid")
+	}
+	existModel, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get processDefinition by id failed: %w", err)
+	}
+
+	model, err := s.validateAndBuildModel(params)
+	if err != nil {
+		return err
+	}
+
+	model.ID = existModel.ID
+	model.Version = existModel.Version
+	model.IsActive = existModel.IsActive
+	model.CreatedAt = existModel.CreatedAt
+	model.CreatedBy = existModel.CreatedBy
+	if model.Code == "" {
+		model.Code = existModel.Code
+	}
+
+	err = s.repo.Update(ctx, model)
+	if err != nil {
+		return fmt.Errorf("fail to update processDefinition: %w", err)
+	}
+	return nil
+}
+
+func (s *ProcessDefinitionService) validateAndBuildModel(params *biz.ProcessDefinitionCreateParams) (*domain.ProcessDefinition, error) {
+	if params == nil {
+		return nil, fmt.Errorf("params is nil")
+	}
+	if params.Structure == nil {
+		return nil, fmt.Errorf("structure is nil")
+	}
+
+	if err := validateFormDefinition(params.FormDefinition); err != nil {
+		return nil, fmt.Errorf("invalid form_definition: %w", err)
+	}
+	if err := validateGraphStructure(params.Structure); err != nil {
+		return nil, fmt.Errorf("invalid structure graph: %w", err)
+	}
+	if err := validateXORRoutingRules(params.Structure); err != nil {
+		return nil, fmt.Errorf("invalid structure routing rules: %w", err)
+	}
+	if err := validateInclusiveRoutingRules(params.Structure); err != nil {
+		return nil, fmt.Errorf("invalid structure routing rules: %w", err)
+	}
+
+	for _, node := range params.Structure.Nodes {
+		if node.Type == domain.NodeTypeEmailService {
+			if !s.emailServiceEnabled {
+				return nil, fmt.Errorf("email service node is disabled")
+			}
+			var emailParams domain.EmailNodeParams
+			if err := json.Unmarshal(node.Properties, &emailParams); err != nil {
+				return nil, fmt.Errorf("fail to unmarshal email service properties: %w", err)
+			}
+			if err := validateEmailNodeParams(emailParams); err != nil {
+				return nil, fmt.Errorf("invalid email service properties: %w", err)
+			}
+		}
+	}
+
+	model, err := paramsToProcessDef(params)
+	if err != nil {
+		return nil, fmt.Errorf("convert request to model failed: %w", err)
+	}
+	return model, nil
 }
 
 func validateFormDefinition(items []biz.FormDataItem) error {
@@ -84,16 +145,16 @@ func validateFormDefinition(items []biz.FormDataItem) error {
 }
 
 func validateEmailNodeParams(params domain.EmailNodeParams) error {
-	if strings.TrimSpace(params.To) == "" {
+	if params.To == "" {
 		return fmt.Errorf("to is required")
 	}
 	if _, err := mail.ParseAddress(params.To); err != nil {
 		return fmt.Errorf("invalid to address: %w", err)
 	}
-	if strings.TrimSpace(params.Subject) == "" {
+	if params.Subject == "" {
 		return fmt.Errorf("subject is required")
 	}
-	if strings.TrimSpace(params.Body) == "" {
+	if params.Body == "" {
 		return fmt.Errorf("body is required")
 	}
 	return nil
@@ -250,42 +311,5 @@ func validateInclusiveRoutingRules(graph *domain.GraphModel) error {
 		}
 	}
 
-	return nil
-}
-
-func (s *ProcessDefinitionService) ListProcessDefinitions(ctx context.Context, params *biz.ProcessDefinitionListParams) ([]domain.ProcessDefinition, error) {
-	// 这里实现获取流程模板列表的业务逻辑
-	// 业务校验：分页参数是否合法
-	pdList, err := s.repo.List(ctx, params)
-	if err != nil {
-		return nil, fmt.Errorf("fail to get processDefinition list: %w", err)
-	}
-	return pdList, nil
-}
-
-func (s *ProcessDefinitionService) GetProcessDefinitionDetail(ctx context.Context, id int64) (*domain.ProcessDefinition, error) {
-	// 这里实现获取流程模板详情的业务逻辑
-	pdDetail, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("fail to get processDefinition detail: %w", err)
-	}
-	return pdDetail, nil
-}
-
-func (s *ProcessDefinitionService) DeleteProcessDefinition(ctx context.Context, id int64) error {
-	// 这里实现删除流程模板的业务逻辑
-	// 业务校验：流程模板是否存在，是否允许删除等
-
-	s.repo.DeleteByID(ctx, id)
-	return nil
-}
-
-func (s *ProcessDefinitionService) UpdateProcessDefinition(ctx context.Context, model *domain.ProcessDefinition) error {
-	// 这里实现更新流程模板的业务逻辑
-	// 业务校验：流程模板是否存在，唯一字段是否冲突等
-	err := s.repo.Update(ctx, model)
-	if err != nil {
-		return fmt.Errorf("fail to update processDefinition: %w", err)
-	}
 	return nil
 }

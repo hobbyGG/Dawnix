@@ -468,7 +468,59 @@ GET /api/v1/definition/1
 
 ---
 
-### 1.4 删除流程定义
+### 1.4 编辑流程定义
+
+**接口**: `PUT /api/v1/definition/:id`
+
+**功能**: 编辑指定流程定义
+
+**路径参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | int64 | 是 | 流程定义ID |
+
+**请求体**:
+```json
+{
+  "code": "leave_request",
+  "name": "请假审批流程(新版)",
+  "structure": {
+    "nodes": [...],
+    "edges": [...],
+    "viewport": {"x": 0, "y": 0, "zoom": 1}
+  },
+  "form_definition": [
+    {
+      "id": "days",
+      "label": "days",
+      "type": "number",
+      "value": 0
+    }
+  ]
+}
+```
+
+**请求示例**:
+```
+PUT /api/v1/definition/1
+```
+
+**响应体**:
+```json
+{
+  "status": "updated success"
+}
+```
+
+**状态码**:
+- `200`: 编辑成功
+- `400`: 请求参数错误
+- `500`: 服务器错误
+
+---
+
+### 1.5 删除流程定义
 
 **接口**: `DELETE /api/v1/definition/:id`
 

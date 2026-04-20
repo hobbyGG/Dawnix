@@ -30,7 +30,8 @@ Use this skill when:
    - Wrap errors with fmt.Errorf and %w when returning context upward.
    - Prefer actionable context in error messages.
 7. Do not create or modify test code unless the user explicitly asks.
-8. Run targeted checks (build or lint) relevant to changed code.
+8. Do not use any TrimpSpace() or similar functions that modify the input string in any way. 
+9. Run targeted checks (build or lint) relevant to changed code.
 
 ## Decision Points
 - If a change has no operational value, skip logging.

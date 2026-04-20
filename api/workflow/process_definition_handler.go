@@ -32,6 +32,9 @@ func (h *ProcessDefinitionHandler) Register(rg *gin.RouterGroup) {
 	// 获取流程模板列表
 	r.GET(":id", h.Detail)
 
+	// 编辑流程模板
+	r.PUT(":id", h.Update)
+
 	// 删除流程模板
 	r.DELETE(":id", h.Delete)
 }
@@ -110,6 +113,26 @@ func (h *ProcessDefinitionHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "deleted success"})
+}
+
+func (h *ProcessDefinitionHandler) Update(c *gin.Context) {
+	req := new(ProcessDefinitionUpdateReq)
+	if err := c.ShouldBindUri(req); err != nil {
+		h.logger.Error("failed to bind ProcessDefinitionUpdateReq uri", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := c.ShouldBindJSON(req); err != nil {
+		h.logger.Error("failed to bind ProcessDefinitionUpdateReq body", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.svc.UpdateProcessDefinition(c, req.ID, req.ProcessDefinitionCreateReq.ToBizParams()); err != nil {
+		h.logger.Error("fail to UpdateProcessDefinition", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "updated success"})
 }
 
 type ProcessDefinitionCreateReq struct {
@@ -207,4 +230,9 @@ type ProcessDefinitionDetailReq struct {
 
 type ProcessDefinitionDeleteReq struct {
 	ID int64 `uri:"id" binding:"required,min=1"` // 流程模板ID
+}
+
+type ProcessDefinitionUpdateReq struct {
+	ID int64 `uri:"id" binding:"required,min=1"` // 流程模板ID
+	ProcessDefinitionCreateReq
 }

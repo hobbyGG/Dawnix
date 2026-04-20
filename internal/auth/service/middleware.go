@@ -25,7 +25,7 @@ func JWTMiddleware(authService *Service) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing bearer token"})
 			return
 		}
-		token := strings.TrimSpace(strings.TrimPrefix(authorization, "Bearer "))
+		token := strings.TrimPrefix(authorization, "Bearer ")
 		claims, err := authService.ParseToken(token)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
