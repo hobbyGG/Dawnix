@@ -51,6 +51,40 @@ func (r *Repo) GetIdentityByProviderAndSub(ctx context.Context, provider string,
 	}, nil
 }
 
+func (r *Repo) CreateUserAndIdentity(ctx context.Context, user *authBiz.User, identity *authBiz.AuthIdentity) error {
+	if user == nil {
+		return fmt.Errorf("user is nil")
+	}
+	if identity == nil {
+		return fmt.Errorf("identity is nil")
+	}
+
+	userPO := authModel.User{
+		UserID:      user.UserID,
+		DisplayName: user.DisplayName,
+		Status:      user.Status,
+	}
+	identityPO := authModel.AuthIdentity{
+		UserID:         identity.UserID,
+		Provider:       identity.Provider,
+		ProviderSub:    identity.ProviderSub,
+		CredentialHash: identity.CredentialHash,
+	}
+
+	if err := r.db.DB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&userPO).Error; err != nil {
+			return fmt.Errorf("create user failed: %w", err)
+		}
+		if err := tx.Create(&identityPO).Error; err != nil {
+			return fmt.Errorf("create identity failed: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("create user and identity failed: %w", err)
+	}
+	return nil
+}
+
 func (r *Repo) UpdateIdentityLastLogin(ctx context.Context, id int64, loginAtUnix int64) error {
 	loginAt := time.Unix(loginAtUnix, 0)
 	result := r.db.DB(ctx).WithContext(ctx).Model(&authModel.AuthIdentity{}).Where("id = ?", id).Update("last_login_at", loginAt)

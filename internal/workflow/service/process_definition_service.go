@@ -78,8 +78,11 @@ func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, pa
 
 func validateFormDefinition(items []biz.FormDataItem) error {
 	for i, item := range items {
-		if item.Key == "" {
-			return fmt.Errorf("item[%d].key is required", i)
+		if item.ID == "" {
+			return fmt.Errorf("item[%d].id is required", i)
+		}
+		if item.Label == "" {
+			return fmt.Errorf("item[%d].label is required", i)
 		}
 		if item.Type == "" {
 			return fmt.Errorf("item[%d].type is required", i)

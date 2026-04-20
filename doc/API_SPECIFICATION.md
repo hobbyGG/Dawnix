@@ -10,15 +10,53 @@
 
 **鉴权方式**: Bearer Token（JWT）
 
-> 认证能力遵循 KISS：当前仅提供登录和登出接口。
+> 认证能力遵循 KISS：当前提供注册、登录和登出接口。
 
 ---
 
 ## 0. 认证接口 (Auth)
 
-### 0.1 登录
+### 0.1 注册 (Signup)
 
-**接口**: `POST /api/v1/auth/login`
+**接口**: `POST /api/v1/auth/signup`
+
+**功能**: 使用本地账号密码注册新用户。
+
+**请求体**:
+```json
+{
+  "username": "admin",
+  "password": "password",
+  "display_name": "管理员"
+}
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| username | string | 是 | 登录账号（唯一） |
+| password | string | 是 | 登录密码 |
+| display_name | string | 否 | 显示名称；不传时默认使用 username |
+
+**响应体**:
+```json
+{
+  "user_id": "1980531045852420096",
+  "username": "admin",
+  "display_name": "管理员"
+}
+```
+
+**状态码**:
+- `200`: 注册成功
+- `400`: 请求参数错误
+- `409`: 用户名已存在
+- `500`: 服务器错误
+
+### 0.2 登录 (Signin)
+
+**接口**: `POST /api/v1/auth/signin`
 
 **功能**: 使用本地账号密码登录，签发访问令牌。
 
@@ -44,7 +82,7 @@
 - `400`: 请求参数错误
 - `401`: 用户名或密码错误
 
-### 0.2 登出
+### 0.3 登出
 
 **接口**: `POST /api/v1/auth/logout`
 
@@ -198,12 +236,14 @@
   },
   "form_definition": [
     {
-      "key": "days",
+      "id": "days",
+      "label": "days",
       "type": "number",
       "value": 0
     },
     {
-      "key": "reason",
+      "id": "reason",
+      "label": "reason",
       "type": "string",
       "value": ""
     }
@@ -232,7 +272,8 @@
 | structure.edges[].is_default | boolean | 否 | 是否为默认连线 |
 | structure.viewport | object | 否 | 视口状态(用于恢复前端画布状态) |
 | form_definition | array | 否 | 表单定义项 |
-| form_definition[].key | string | 是 | 表单字段key |
+| form_definition[].id | string | 是 | 表单字段唯一ID |
+| form_definition[].label | string | 是 | 表单字段展示名，作为运行时变量名 |
 | form_definition[].type | string | 是 | 字段类型: string, number, boolean, etc. |
 | form_definition[].value | any | 否 | 字段默认值 |
 
@@ -326,12 +367,14 @@ GET /api/v1/definition/1
   },
   "form_definition": [
     {
-      "key": "days",
+      "id": "days",
+      "label": "days",
       "type": "number",
       "value": 0
     },
     {
-      "key": "reason",
+      "id": "reason",
+      "label": "reason",
       "type": "string",
       "value": ""
     }
@@ -399,12 +442,14 @@ DELETE /api/v1/definition/1
   "submitter_id": "u_admin",
   "form_data": [
     {
-      "key": "days",
+      "id": "days",
+      "label": "days",
       "type": "number",
       "value": 3
     },
     {
-      "key": "reason",
+      "id": "reason",
+      "label": "reason",
       "type": "string",
       "value": "年假"
     }
@@ -421,7 +466,8 @@ DELETE /api/v1/definition/1
 | process_code | string | 是 | 流程代码，对应ProcessDefinition的code字段 |
 | submitter_id | string | 否 | 发起人ID；已登录时以后端 token 注入为准 |
 | form_data | array | 否 | 业务表单数据 |
-| form_data[].key | string | 是 | 字段key |
+| form_data[].id | string | 是 | 字段唯一ID |
+| form_data[].label | string | 是 | 字段展示名，作为运行时变量名 |
 | form_data[].type | string | 是 | 字段类型 |
 | form_data[].value | any | 是 | 字段值 |
 | parent_id | int64 | 否 | 父流程实例ID (子流程场景) |
@@ -474,7 +520,8 @@ GET /api/v1/instance/list?page=1&size=20
       "parent_node_id": "",
       "form_data": [
         {
-          "key": "days",
+          "id": "days",
+          "label": "days",
           "type": "number",
           "value": 3
         }
@@ -534,12 +581,14 @@ GET /api/v1/instance/100
   "parent_node_id": "",
   "form_data": [
     {
-      "key": "days",
+      "id": "days",
+      "label": "days",
       "type": "number",
       "value": 3
     },
     {
-      "key": "reason",
+      "id": "reason",
+      "label": "reason",
       "type": "string",
       "value": "年假"
     }
@@ -628,7 +677,8 @@ GET /api/v1/task/200
   "comment": "",
   "form_data": [
     {
-      "key": "days",
+      "id": "days",
+      "label": "days",
       "type": "number",
       "value": 3
     }
@@ -731,12 +781,14 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
   "comment": "已审批同意",
   "form_data": [
     {
-      "key": "days",
+      "id": "days",
+      "label": "days",
       "type": "number",
       "value": 3
     },
     {
-      "key": "approval_opinion",
+      "id": "approval_opinion",
+      "label": "approval_opinion",
       "type": "string",
       "value": "同意请假"
     }
@@ -751,7 +803,8 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
 | action | string | 是 | 操作类型: agree(同意), reject(驳回) |
 | comment | string | 否 | 审批意见/备注 |
 | form_data | array | 否 | 提交的表单数据 |
-| form_data[].key | string | 是 | 字段key |
+| form_data[].id | string | 是 | 字段唯一ID |
+| form_data[].label | string | 是 | 字段展示名，作为运行时变量名 |
 | form_data[].type | string | 是 | 字段类型 |
 | form_data[].value | any | 是 | 字段值 |
 
@@ -774,11 +827,15 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
 
 ### FormDataItem (表单数据项)
 
-表单数据采用列表形式，每个项包含key、type和value三个字段。
+表单数据采用列表形式，每个项包含id、label、type和value四个字段。
+
+- `id`：字段的唯一标识，用于合并和定位同一项
+- `label`：字段展示名，同时作为运行时表达式变量名
 
 ```json
 {
-  "key": "field_name",
+  "id": "field_001",
+  "label": "field_name",
   "type": "string",
   "value": "field_value"
 }
@@ -910,7 +967,7 @@ const request = async (method, path, data = null) => {
 const definitions = await request('GET', '/definition/list?page=1&size=10');
 
 // 登录（成功后保存 access_token）
-const loginResp = await request('POST', '/auth/login', {
+const loginResp = await request('POST', '/auth/signin', {
   username: 'admin',
   password: 'password'
 });
@@ -947,7 +1004,7 @@ await request('POST', `/task/complete/${taskId}`, {
 
 ### 1. 登录获取 Token
 
-1. 调用 `POST /api/v1/auth/login`
+1. 调用 `POST /api/v1/auth/signin`
 2. 保存 `access_token`
 3. 后续请求统一携带 `Authorization: Bearer <token>`
 

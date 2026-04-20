@@ -15,7 +15,7 @@ func JWTMiddleware(authService *Service) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		if c.Request.URL.Path == "/api/v1/auth/login" {
+		if c.Request.URL.Path == "/api/v1/auth/signin" || c.Request.URL.Path == "/api/v1/auth/signup" {
 			c.Next()
 			return
 		}

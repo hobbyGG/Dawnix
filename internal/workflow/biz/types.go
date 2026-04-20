@@ -18,7 +18,8 @@ type RuntimeGraph struct {
 
 // FormDataItem is a generic form item used by both definition and instance payloads.
 type FormDataItem struct {
-	Key   string          `json:"key"`
+	ID    string          `json:"id"`
+	Label string          `json:"label"`
 	Value json.RawMessage `json:"value"`
 	Type  string          `json:"type"`
 }
@@ -38,17 +39,17 @@ func DecodeFormDataItems(payload []byte) ([]FormDataItem, error) {
 func FormDataItemsToMap(items []FormDataItem) (map[string]interface{}, error) {
 	values := make(map[string]interface{}, len(items))
 	for _, item := range items {
-		if item.Key == "" {
+		if item.Label == "" {
 			continue
 		}
 
 		var val interface{}
 		if len(item.Value) > 0 {
 			if err := json.Unmarshal(item.Value, &val); err != nil {
-				return nil, fmt.Errorf("unmarshal form item value for key %s failed: %w", item.Key, err)
+				return nil, fmt.Errorf("unmarshal form item value for label %s failed: %w", item.Label, err)
 			}
 		}
-		values[item.Key] = val
+		values[item.Label] = val
 	}
 	return values, nil
 }
@@ -59,27 +60,36 @@ func MergeFormDataItems(base []FormDataItem, incoming []FormDataItem) []FormData
 	}
 
 	merged := append([]FormDataItem{}, base...)
-	indexByKey := make(map[string]int, len(merged))
+	indexByIdentity := make(map[string]int, len(merged))
 	for i, item := range merged {
-		if item.Key == "" {
+		identity := formItemIdentity(item)
+		if identity == "" {
 			continue
 		}
-		indexByKey[item.Key] = i
+		indexByIdentity[identity] = i
 	}
 
 	for _, item := range incoming {
-		if item.Key == "" {
+		identity := formItemIdentity(item)
+		if identity == "" {
 			continue
 		}
-		if idx, ok := indexByKey[item.Key]; ok {
+		if idx, ok := indexByIdentity[identity]; ok {
 			merged[idx] = item
 			continue
 		}
-		indexByKey[item.Key] = len(merged)
+		indexByIdentity[identity] = len(merged)
 		merged = append(merged, item)
 	}
 
 	return merged
+}
+
+func formItemIdentity(item FormDataItem) string {
+	if item.ID != "" {
+		return item.ID
+	}
+	return item.Label
 }
 
 func NewSchedulerRuntimeGraph(graphModel *domain.GraphModel, registry NodeRegistry) (*RuntimeGraph, error) {

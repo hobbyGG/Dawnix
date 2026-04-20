@@ -18,7 +18,7 @@ type ProcessTask struct {
 	Action      string         `gorm:"type:varchar(32)"`
 	Comment     string         `gorm:"type:text"`
 	FormData    datatypes.JSON `gorm:"type:jsonb;column:form_data;default:'{}'" json:"form_data"`
-}
+}	
 
 func (ProcessTask) TableName() string {
 	return "process_tasks"

@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	authBiz "github.com/hobbyGG/Dawnix/internal/auth/biz"
+	"github.com/hobbyGG/Dawnix/util"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -23,6 +25,20 @@ type Service struct {
 	repo   authBiz.Repo
 	cfg    Config
 	logger *zap.Logger
+}
+
+var ErrUsernameAlreadyExists = errors.New("username already exists")
+
+type RegisterParams struct {
+	Username    string
+	Password    string
+	DisplayName string
+}
+
+type RegisterResult struct {
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
 }
 
 type LoginParams struct {
@@ -46,6 +62,52 @@ func NewService(repo authBiz.Repo, cfg Config, logger *zap.Logger) *Service {
 		cfg.JWTExpireMinutes = 120
 	}
 	return &Service{repo: repo, cfg: cfg, logger: logger}
+}
+
+func (s *Service) Register(ctx context.Context, params *RegisterParams) (*RegisterResult, error) {
+	if params == nil {
+		return nil, fmt.Errorf("register params is nil")
+	}
+	username := strings.TrimSpace(params.Username)
+	if username == "" || strings.TrimSpace(params.Password) == "" {
+		return nil, fmt.Errorf("username and password are required")
+	}
+	displayName := strings.TrimSpace(params.DisplayName)
+	if displayName == "" {
+		displayName = username
+	}
+
+	_, err := s.repo.GetIdentityByProviderAndSub(ctx, authBiz.ProviderLocalPassword, username)
+	if err == nil {
+		return nil, ErrUsernameAlreadyExists
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("check username existence failed: %w", err)
+	}
+
+	credentialHash, err := bcrypt.GenerateFromPassword([]byte(params.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("hash password failed: %w", err)
+	}
+	userID := util.NextSnowflakeIDString()
+	if err := s.repo.CreateUserAndIdentity(ctx, &authBiz.User{
+		UserID:      userID,
+		DisplayName: displayName,
+		Status:      authBiz.UserStatusActive,
+	}, &authBiz.AuthIdentity{
+		UserID:         userID,
+		Provider:       authBiz.ProviderLocalPassword,
+		ProviderSub:    username,
+		CredentialHash: string(credentialHash),
+	}); err != nil {
+		return nil, fmt.Errorf("register user failed: %w", err)
+	}
+
+	return &RegisterResult{
+		UserID:      userID,
+		Username:    username,
+		DisplayName: displayName,
+	}, nil
 }
 
 func (s *Service) Login(ctx context.Context, params *LoginParams) (*LoginResult, error) {
