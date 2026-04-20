@@ -11,6 +11,7 @@
 **鉴权方式**: Bearer Token（JWT）
 
 > 认证能力遵循 KISS：当前提供注册、登录和登出接口。
+> Workflow 相关接口当前直接返回领域对象，响应字段名以 PascalCase 为主（如 `ID`、`CreatedAt`）。
 
 ---
 
@@ -187,7 +188,7 @@
     "nodes": [
       {
         "id": "start",
-        "type": "start_event",
+        "type": "start",
         "name": "开始",
         "candidates": {},
         "properties": null
@@ -197,8 +198,7 @@
         "type": "user_task",
         "name": "经理审批",
         "candidates": {
-          "candidate_users": ["user_id_1", "user_id_2"],
-          "candidate_groups": []
+          "users": ["user_id_1", "user_id_2"]
         },
         "properties": {
           "assignee_rule": "FIRST_ONE"
@@ -206,7 +206,7 @@
       },
       {
         "id": "end",
-        "type": "end_event",
+        "type": "end",
         "name": "结束",
         "candidates": {},
         "properties": null
@@ -260,7 +260,7 @@
 | structure | object | 是 | 流程结构 (节点和连线) |
 | structure.nodes | array | 是 | 节点列表 |
 | structure.nodes[].id | string | 是 | 节点唯一ID |
-| structure.nodes[].type | string | 是 | 节点类型: start_event, end_event, user_task, fork_gateway, join_gateway, xor_gateway, inclusive_gateway；email_service 为可选插件节点，默认关闭 |
+| structure.nodes[].type | string | 是 | 节点类型: start, end, user_task, fork_gateway, join_gateway, xor_gateway, inclusive_gateway；email_service 为可选插件节点，默认关闭 |
 | structure.nodes[].name | string | 是 | 节点显示名称 |
 | structure.nodes[].candidates | object | 否 | 候选人信息(仅user_task有效) |
 | structure.nodes[].properties | object | 否 | 节点特有属性 (JSON格式) |
@@ -312,22 +312,51 @@ GET /api/v1/definition/list?page=1&size=10
 **响应体**:
 ```json
 {
-  "total": 25,
+  "total": 1,
   "list": [
     {
-      "id": 1,
-      "code": "leave_request",
-      "version": 1,
-      "name": "请假审批流程",
-      "structure": {...},
-      "form_definition": [...],
-      "is_active": true,
-      "created_at": "2024-01-15T10:30:00Z",
-      "updated_at": "2024-01-15T10:30:00Z"
+      "ID": 1,
+      "CreatedAt": "2024-01-15T10:30:00Z",
+      "UpdatedAt": "2024-01-15T10:30:00Z",
+      "DeletedAt": null,
+      "CreatedBy": "",
+      "UpdatedBy": "",
+      "Code": "leave_request",
+      "Version": 1,
+      "Name": "请假审批流程",
+      "Structure": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "开始"
+          }
+        ],
+        "edges": [
+          {
+            "id": "edge_1",
+            "source_node": "start",
+            "target_node": "end",
+            "condition": "",
+            "is_default": false
+          }
+        ]
+      },
+      "FormDefinition": [
+        {
+          "id": "days",
+          "label": "days",
+          "type": "number",
+          "value": 0
+        }
+      ],
+      "IsActive": true
     }
   ]
 }
 ```
+
+> 说明：`total` 当前实现为本次返回列表长度（`len(list)`），不是全量总记录数。
 
 **状态码**:
 - `200`: 查询成功
@@ -356,16 +385,21 @@ GET /api/v1/definition/1
 **响应体**:
 ```json
 {
-  "id": 1,
-  "code": "leave_request",
-  "version": 1,
-  "name": "请假审批流程",
-  "structure": {
+  "ID": 1,
+  "CreatedAt": "2024-01-15T10:30:00Z",
+  "UpdatedAt": "2024-01-15T10:30:00Z",
+  "DeletedAt": null,
+  "CreatedBy": "",
+  "UpdatedBy": "",
+  "Code": "leave_request",
+  "Version": 1,
+  "Name": "请假审批流程",
+  "Structure": {
     "nodes": [...],
     "edges": [...],
     "viewport": {...}
   },
-  "form_definition": [
+  "FormDefinition": [
     {
       "id": "days",
       "label": "days",
@@ -379,16 +413,13 @@ GET /api/v1/definition/1
       "value": ""
     }
   ],
-  "is_active": true,
-  "created_at": "2024-01-15T10:30:00Z",
-  "updated_at": "2024-01-15T10:30:00Z"
+  "IsActive": true
 }
 ```
 
 **状态码**:
 - `200`: 查询成功
 - `400`: ID参数错误
-- `404`: 流程定义不存在
 - `500`: 服务器错误
 
 ---
@@ -420,7 +451,6 @@ DELETE /api/v1/definition/1
 **状态码**:
 - `200`: 删除成功
 - `400`: ID参数错误
-- `404`: 流程定义不存在
 - `500`: 服务器错误
 
 ---
@@ -483,7 +513,6 @@ DELETE /api/v1/definition/1
 **状态码**:
 - `200`: 实例创建成功
 - `400`: 请求参数错误
-- `404`: 流程定义不存在
 - `500`: 服务器错误
 
 ---
@@ -498,8 +527,8 @@ DELETE /api/v1/definition/1
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| page | int | 否 | 页码，默认1 |
-| size | int | 否 | 每页数量，默认10，最多100 |
+| page | int | 否 | 页码 |
+| size | int | 否 | 每页数量，最大100 |
 
 **请求示例**:
 ```
@@ -508,32 +537,25 @@ GET /api/v1/instance/list?page=1&size=20
 
 **响应体**:
 ```json
-{
-  "total": 50,
-  "items": [
-    {
-      "id": 100,
-      "definition_id": 1,
-      "process_code": "leave_request",
-      "snapshot_structure": {...},
-      "parent_id": 0,
-      "parent_node_id": "",
-      "form_data": [
-        {
-          "id": "days",
-          "label": "days",
-          "type": "number",
-          "value": 3
-        }
-      ],
-      "status": "PENDING",
-      "submitter_id": "user_123",
-      "finished_at": null,
-      "created_at": "2024-01-15T10:30:00Z",
-      "updated_at": "2024-01-15T10:30:00Z"
-    }
-  ]
-}
+[
+  {
+    "ID": 100,
+    "CreatedAt": "2024-01-15T10:30:00Z",
+    "UpdatedAt": "2024-01-15T10:30:00Z",
+    "DeletedAt": null,
+    "CreatedBy": "",
+    "UpdatedBy": "",
+    "DefinitionID": 1,
+    "ProcessCode": "leave_request",
+    "SnapshotStructure": {...},
+    "ParentID": 0,
+    "ParentNodeID": "",
+    "FormData": [...],
+    "Status": "PENDING",
+    "SubmitterID": "user_123",
+    "FinishedAt": null
+  }
+]
 ```
 
 **实例状态**:
@@ -570,41 +592,46 @@ GET /api/v1/instance/100
 **响应体**:
 ```json
 {
-  "id": 100,
-  "definition_id": 1,
-  "process_code": "leave_request",
-  "snapshot_structure": {
-    "nodes": [...],
-    "edges": [...]
-  },
-  "parent_id": 0,
-  "parent_node_id": "",
-  "form_data": [
-    {
-      "id": "days",
-      "label": "days",
-      "type": "number",
-      "value": 3
+  "inst": {
+    "ID": 100,
+    "CreatedAt": "2024-01-15T10:30:00Z",
+    "UpdatedAt": "2024-01-15T10:30:00Z",
+    "DeletedAt": null,
+    "CreatedBy": "",
+    "UpdatedBy": "",
+    "DefinitionID": 1,
+    "ProcessCode": "leave_request",
+    "SnapshotStructure": {
+      "nodes": [...],
+      "edges": [...]
     },
+    "ParentID": 0,
+    "ParentNodeID": "",
+    "FormData": [...],
+    "Status": "PENDING",
+    "SubmitterID": "user_123",
+    "FinishedAt": null
+  },
+  "executions": [
     {
-      "id": "reason",
-      "label": "reason",
-      "type": "string",
-      "value": "年假"
+      "ID": 50,
+      "CreatedAt": "2024-01-15T10:30:00Z",
+      "UpdatedAt": "2024-01-15T10:30:00Z",
+      "DeletedAt": null,
+      "CreatedBy": "",
+      "UpdatedBy": "",
+      "InstID": 100,
+      "ParentID": 0,
+      "NodeID": "manager_review",
+      "IsActive": true
     }
-  ],
-  "status": "PENDING",
-  "submitter_id": "user_123",
-  "finished_at": null,
-  "created_at": "2024-01-15T10:30:00Z",
-  "updated_at": "2024-01-15T10:30:00Z"
+  ]
 }
 ```
 
 **状态码**:
 - `200`: 查询成功
 - `400`: ID参数错误
-- `404`: 流程实例不存在
 - `500`: 服务器错误
 
 ---
@@ -636,7 +663,6 @@ DELETE /api/v1/instance/100
 **状态码**:
 - `200`: 删除成功
 - `400`: ID参数错误
-- `404`: 流程实例不存在
 - `500`: 服务器错误
 
 ---
@@ -649,7 +675,7 @@ DELETE /api/v1/instance/100
 
 **接口**: `GET /api/v1/task/:id`
 
-**功能**: 获取指定任务的详细信息
+**功能**: 获取任务视图信息（当前实现返回 TaskView）
 
 **路径参数**:
 
@@ -665,26 +691,12 @@ GET /api/v1/task/200
 **响应体**:
 ```json
 {
-  "id": 200,
-  "instance_id": 100,
-  "execution_id": 50,
-  "node_id": "manager_review",
-  "type": "user_task",
-  "assignee": "user_456",
-  "candidates": ["user_456", "user_789"],
-  "status": "PENDING",
-  "action": "",
-  "comment": "",
-  "form_data": [
-    {
-      "id": "days",
-      "label": "days",
-      "type": "number",
-      "value": 3
-    }
-  ],
-  "created_at": "2024-01-15T10:30:00Z",
-  "updated_at": "2024-01-15T10:30:00Z"
+  "ID": 200,
+  "TaskName": "经理审批",
+  "Status": "PENDING",
+  "ProcessTitle": "请假审批流程",
+  "SubmitterName": "user_123",
+  "ArrivedAt": "2024-01-15T10:30:00Z"
 }
 ```
 
@@ -704,10 +716,8 @@ GET /api/v1/task/200
 - `cc_task`: 抄送任务
 
 **状态码**:
-- `200`: 查询成功
+- `200`: 查询成功（业务错误时返回 `{"error":"..."}`）
 - `400`: ID参数错误
-- `404`: 任务不存在
-- `500`: 服务器错误
 
 ---
 
@@ -736,29 +746,31 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
   "total": 5,
   "tasks": [
     {
-      "id": 200,
-      "task_name": "经理审批",
-      "status": "PENDING",
-      "process_title": "请假审批流程",
-      "submitter_name": "张三",
-      "arrived_at": "2024-01-15T10:30:00Z"
+      "ID": 200,
+      "TaskName": "经理审批",
+      "Status": "PENDING",
+      "ProcessTitle": "请假审批流程",
+      "SubmitterName": "user_123",
+      "ArrivedAt": "2024-01-15T10:30:00Z"
     },
     {
-      "id": 201,
-      "task_name": "部长审批",
-      "status": "PENDING",
-      "process_title": "请假审批流程",
-      "submitter_name": "李四",
-      "arrived_at": "2024-01-15T11:00:00Z"
+      "ID": 201,
+      "TaskName": "部长审批",
+      "Status": "PENDING",
+      "ProcessTitle": "请假审批流程",
+      "SubmitterName": "user_456",
+      "ArrivedAt": "2024-01-15T11:00:00Z"
     }
   ]
 }
 ```
 
+> 说明：`scope` 除 `my_pending/my_completed/all_pending/all_completed` 外，还支持 `my_todo`（默认值）。
+
 **状态码**:
-- `200`: 查询成功
+- `200`: 查询成功（业务错误时返回 `{"error":"..."}`）
 - `400`: 参数错误
-- `500`: 服务器错误
+- `401`: 未认证或 token 无效
 
 ---
 
@@ -816,10 +828,9 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
 ```
 
 **状态码**:
-- `200`: 任务完成成功，流程继续推进
+- `200`: 任务完成成功（业务错误时返回 `{"error":"..."}`）
 - `400`: 请求参数错误
-- `404`: 任务不存在
-- `500`: 服务器错误
+- `401`: 未认证或 token 无效
 
 ---
 
@@ -856,8 +867,7 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
 
 ```json
 {
-  "candidate_users": ["user_id_1", "user_id_2"],
-  "candidate_groups": ["group_id_1"]
+  "users": ["user_id_1", "user_id_2"]
 }
 ```
 
@@ -879,7 +889,7 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
 
 ### 节点能力说明
 
-- `start_event` / `end_event`: 流程开始与结束节点
+- `start` / `end`: 流程开始与结束节点
 - `user_task`: 用户任务节点，需要人工审批
 - `fork_gateway` / `join_gateway` / `xor_gateway` / `inclusive_gateway`: 网关节点
 - `email_service`: 邮件服务节点，默认关闭；启用后会投递邮件任务到 Redis，由 worker 消费发送
