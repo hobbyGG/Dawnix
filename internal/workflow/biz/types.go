@@ -105,54 +105,6 @@ func ValidateFormDataItems(items []FormDataItem, mode FormValidationMode) error 
 	return nil
 }
 
-func ValidateRuntimeFormDataAgainstDefinition(definitionItems []FormDataItem, runtimeItems []FormDataItem) error {
-	if err := ValidateFormDataItems(definitionItems, FormValidationModeDefinition); err != nil {
-		return fmt.Errorf("invalid form_definition: %w", err)
-	}
-	if err := ValidateFormDataItems(runtimeItems, FormValidationModeRuntime); err != nil {
-		return fmt.Errorf("invalid form_data payload: %w", err)
-	}
-
-	definitionByID := make(map[string]FormDataItem, len(definitionItems))
-	definitionByLabel := make(map[string]FormDataItem, len(definitionItems))
-	for _, item := range definitionItems {
-		definitionByID[item.ID] = item
-		definitionByLabel[item.Label] = item
-	}
-
-	for i, runtimeItem := range runtimeItems {
-		ref := formItemRef(runtimeItem, i)
-		definitionItem, ok := definitionByID[runtimeItem.ID]
-		if !ok {
-			definitionItem, ok = definitionByLabel[runtimeItem.Label]
-		}
-		if !ok {
-			return fmt.Errorf("%s is not declared in form_definition", ref)
-		}
-
-		if runtimeItem.ID != definitionItem.ID {
-			return fmt.Errorf("%s id does not match form_definition id %s", ref, definitionItem.ID)
-		}
-		if runtimeItem.Label != definitionItem.Label {
-			return fmt.Errorf("%s label does not match form_definition label %s", ref, definitionItem.Label)
-		}
-
-		runtimeType, err := normalizeFormType(runtimeItem.Type)
-		if err != nil {
-			return fmt.Errorf("%s type is invalid: %w", ref, err)
-		}
-		definitionType, err := normalizeFormType(definitionItem.Type)
-		if err != nil {
-			return fmt.Errorf("form_definition item %s has invalid type: %w", definitionItem.ID, err)
-		}
-		if runtimeType != definitionType {
-			return fmt.Errorf("%s type %s does not match form_definition type %s", ref, runtimeItem.Type, definitionItem.Type)
-		}
-	}
-
-	return nil
-}
-
 func ValidateFormValueByType(typ string, raw json.RawMessage) error {
 	switch typ {
 	case domain.FormTypeTextSingleLine:

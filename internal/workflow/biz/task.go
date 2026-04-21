@@ -11,7 +11,7 @@ type TaskRepo interface {
 	Create(ctx context.Context, task *domain.ProcessTask) error
 	GetByID(ctx context.Context, taskID int64) (*domain.ProcessTask, error)
 	Update(ctx context.Context, task *domain.ProcessTask) error
-	GetDetailView(ctx context.Context, taskID int64) (*domain.TaskView, error)
+	GetDetailView(ctx context.Context, taskID int64) (*domain.TaskDetailView, error)
 	ListWithFilter(ctx context.Context, params *ListTasksParams) ([]*domain.TaskView, int64, error)
 }
 

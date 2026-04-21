@@ -70,14 +70,6 @@ func (s *Scheduler) StartProcessInstance(ctx context.Context, params *StartProce
 			return fmt.Errorf("start node %s has no outgoing edge", runtimeGraph.StartNode.ID())
 		}
 
-		definitionItems, err := DecodeFormDataItems(processDef.FormDefinition)
-		if err != nil {
-			return fmt.Errorf("decode form_definition failed: %w", err)
-		}
-		if err := ValidateRuntimeFormDataAgainstDefinition(definitionItems, params.FormData); err != nil {
-			return fmt.Errorf("invalid form_data: %w", err)
-		}
-
 		formData, err := json.Marshal(params.FormData)
 		if err != nil {
 			return fmt.Errorf("form_data marshal failed: %w", err)
@@ -128,17 +120,15 @@ func (s *Scheduler) CompleteTask(ctx context.Context, task *domain.ProcessTask) 
 		if task == nil {
 			return fmt.Errorf("task is nil")
 		}
-		action := task.Action
-		if action == "" {
-			action = "agree"
-			task.Action = action
+		if task.Action != "agree" && task.Action != "reject" {
+			return fmt.Errorf("invalid task action: %s", task.Action)
 		}
 
 		if err := s.taskRepo.Update(ctx, task); err != nil {
 			return fmt.Errorf("failed to update task status: %w", err)
 		}
 
-		if action == "reject" {
+		if task.Action == "reject" {
 			if err := s.executionRepo.DeleteByID(ctx, task.ExecutionID); err != nil {
 				return fmt.Errorf("failed to delete execution on reject: %w", err)
 			}
@@ -147,32 +137,16 @@ func (s *Scheduler) CompleteTask(ctx context.Context, task *domain.ProcessTask) 
 			}
 			return nil
 		}
-		if action != "agree" {
-			return fmt.Errorf("unsupported action in scheduler: %s", task.Action)
-		}
 
+		// 获取流程并合并表单的信息
 		inst, err := s.instanceRepo.GetByID(ctx, task.InstanceID)
 		if err != nil {
 			return fmt.Errorf("failed to get instance by id: %w", err)
 		}
-		processDef, err := s.definitionRepo.GetByID(ctx, inst.DefinitionID)
-		if err != nil {
-			return fmt.Errorf("failed to get definition by id: %w", err)
-		}
-		definitionItems, err := DecodeFormDataItems(processDef.FormDefinition)
-		if err != nil {
-			return fmt.Errorf("decode form_definition failed: %w", err)
-		}
-		taskItems, err := DecodeFormDataItems(task.FormData)
-		if err != nil {
-			return fmt.Errorf("decode task form_data failed: %w", err)
-		}
-		if err := ValidateRuntimeFormDataAgainstDefinition(definitionItems, taskItems); err != nil {
-			return fmt.Errorf("invalid task form_data: %w", err)
-		}
 		if err := s.mergeInstanceFormData(ctx, inst, task.FormData); err != nil {
 			return err
 		}
+
 		// 解析流程，构建运行时图
 		var graph domain.GraphModel
 		if err := json.Unmarshal(inst.SnapshotStructure, &graph); err != nil {
@@ -183,6 +157,7 @@ func (s *Scheduler) CompleteTask(ctx context.Context, task *domain.ProcessTask) 
 		if err != nil {
 			return fmt.Errorf("build runtime graph failed: %w", err)
 		}
+
 		exec, err := s.executionRepo.GetByID(ctx, task.ExecutionID)
 		if err != nil {
 			return fmt.Errorf("failed to get execution by id: %w", err)
@@ -473,19 +448,29 @@ func (s *Scheduler) moveToken(ctx context.Context, executionID int64, nextNodeID
 		return nil, nil, fmt.Errorf("failed to update execution: %w", err)
 	}
 
+	if isGatewayNodeType(node.Type()) {
+		handler := s.resolveCompleteTaskHandler(node.Type())
+		if err := handler(ctx, exec, rg); err != nil {
+			return nil, nil, err
+		}
+		return exec, nil, nil
+	}
+
 	task, err := node.Handle(ctx, exec, rg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to handle node %s: %w", nextNodeID, err)
 	}
-	if task == nil && node.AutoAdvance() {
-		nextEdges := rg.Next[nextNodeID]
-		if len(nextEdges) == 0 {
-			return nil, nil, fmt.Errorf("node %s has no outgoing edge", nextNodeID)
-		}
-		return s.moveToken(ctx, exec.ID, nextEdges[0].TargetNode, rg)
-	}
 
 	return exec, task, nil
+}
+
+func isGatewayNodeType(nodeType string) bool {
+	switch nodeType {
+	case domain.NodeTypeForkGateway, domain.NodeTypeJoinGateway, domain.NodeTypeXORGateway, domain.NodeTypeInclusiveGateway:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Scheduler) mergeInstanceFormData(ctx context.Context, inst *domain.ProcessInstance, taskFormData []byte) error {

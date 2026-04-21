@@ -20,10 +20,6 @@ func (n nodeBase) Type() string {
 	return n.kind
 }
 
-func (n nodeBase) AutoAdvance() bool {
-	return false
-}
-
 type startNode struct {
 	nodeBase
 }
@@ -129,10 +125,6 @@ func newEmailServiceNode(node *domain.NodeModel, mq ServiceTaskMQ) (Node, error)
 	return &emailServiceNode{nodeBase: nodeBase{id: node.ID, kind: domain.NodeTypeEmailService}, payload: node.Properties, mq: mq}, nil
 }
 
-func (n *emailServiceNode) AutoAdvance() bool {
-	return true
-}
-
 func (n *emailServiceNode) Handle(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) (*domain.ProcessTask, error) {
 	if err := n.mq.ProduceEmailTask(ctx, n.payload); err != nil {
 		return nil, fmt.Errorf("failed to produce email task: %w", err)
@@ -140,20 +132,35 @@ func (n *emailServiceNode) Handle(ctx context.Context, exec *domain.Execution, r
 	return nil, nil
 }
 
-func newForkGatewayNode(node *domain.NodeModel, taskRepo TaskRepo) (Node, error) {
-	return newTaskNode(node, taskRepo, domain.NodeTypeForkGateway, domain.TaskTypeReceive)
+type gatewayNode struct {
+	nodeBase
 }
 
-func newJoinGatewayNode(node *domain.NodeModel, taskRepo TaskRepo) (Node, error) {
-	return newTaskNode(node, taskRepo, domain.NodeTypeJoinGateway, domain.TaskTypeReceive)
+func newGatewayNode(node *domain.NodeModel, kind string) (Node, error) {
+	if node == nil {
+		return nil, fmt.Errorf("node is nil")
+	}
+	return &gatewayNode{nodeBase: nodeBase{id: node.ID, kind: kind}}, nil
 }
 
-func newXorGatewayNode(node *domain.NodeModel, taskRepo TaskRepo) (Node, error) {
-	return newTaskNode(node, taskRepo, domain.NodeTypeXORGateway, domain.TaskTypeReceive)
+func (n *gatewayNode) Handle(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) (*domain.ProcessTask, error) {
+	return nil, nil
 }
 
-func newInclusiveGatewayNode(node *domain.NodeModel, taskRepo TaskRepo) (Node, error) {
-	return newTaskNode(node, taskRepo, domain.NodeTypeInclusiveGateway, domain.TaskTypeReceive)
+func newForkGatewayNode(node *domain.NodeModel) (Node, error) {
+	return newGatewayNode(node, domain.NodeTypeForkGateway)
+}
+
+func newJoinGatewayNode(node *domain.NodeModel) (Node, error) {
+	return newGatewayNode(node, domain.NodeTypeJoinGateway)
+}
+
+func newXorGatewayNode(node *domain.NodeModel) (Node, error) {
+	return newGatewayNode(node, domain.NodeTypeXORGateway)
+}
+
+func newInclusiveGatewayNode(node *domain.NodeModel) (Node, error) {
+	return newGatewayNode(node, domain.NodeTypeInclusiveGateway)
 }
 
 func resolveTaskAssignment(users []string) (string, []string) {

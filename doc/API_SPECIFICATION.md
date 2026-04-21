@@ -11,7 +11,7 @@
 ## 认证与中间件
 
 1. 全局挂载 JWT 中间件：`internal/auth/service/middleware.go`
-2. `/api/v1/auth/*` 与 `OPTIONS` 请求跳过 JWT 校验
+2. `/api/v1/auth/*` 请求跳过 JWT 校验
 3. Workflow 路由（enum/definition/instance/task）还会经过 `InjectUID`：`api/workflow/middleware/uid_middleware.go`
 
 ### CORS（当前实现）
@@ -19,7 +19,7 @@
 - CORS 中间件挂载位置：`cmd/server/manual.go`
 - 允许来源读取配置：`server.cors.allow_origins`（见 `configs/dev.yaml`）
 - 当前默认允许：`http://localhost:5173`
-- 预检请求（`OPTIONS`）由 CORS 中间件处理；若 `Origin` 不在允许列表，返回 `403`
+- 预检请求由 CORS 中间件处理；若 `Origin` 不在允许列表，返回 `403`
 - `http://localhost:5173` 与 `http://127.0.0.1:5173` 属于不同源，需分别配置
 
 ### 鉴权行为（当前实现）
@@ -43,12 +43,12 @@
 | POST | `/definition/create` | 是 | `api/workflow/process_definition_handler.go` |
 | GET | `/definition/list` | 是 | `api/workflow/process_definition_handler.go` |
 | GET | `/definition/:id` | 是 | `api/workflow/process_definition_handler.go` |
-| PUT | `/definition/:id` | 是 | `api/workflow/process_definition_handler.go` |
-| DELETE | `/definition/:id` | 是 | `api/workflow/process_definition_handler.go` |
+| POST | `/definition/update` | 是 | `api/workflow/process_definition_handler.go` |
+| POST | `/definition/delete/:id` | 是 | `api/workflow/process_definition_handler.go` |
 | POST | `/instance/create` | 是 | `api/workflow/instance_handler.go` |
 | GET | `/instance/list` | 是 | `api/workflow/instance_handler.go` |
 | GET | `/instance/:id` | 是 | `api/workflow/instance_handler.go` |
-| DELETE | `/instance/:id` | 是 | `api/workflow/instance_handler.go` |
+| POST | `/instance/delete/:id` | 是 | `api/workflow/instance_handler.go` |
 | GET | `/task/:id` | 是 | `api/workflow/task_handler.go` |
 | GET | `/task/list` | 是 | `api/workflow/task_handler.go` |
 | POST | `/task/complete/:id` | 是 | `api/workflow/task_handler.go` |
@@ -234,7 +234,11 @@
 
 ### 2.4 编辑流程定义
 
-- **接口**: `PUT /api/v1/definition/:id`
+- **接口**: `POST /api/v1/definition/update`
+- **请求体关键字段**:
+  - `id` 必填，流程定义 ID
+  - `name` 必填
+  - `structure` 必填（`nodes`、`edges`）
 - **响应体**:
 
 ```json
@@ -249,7 +253,7 @@
 
 ### 2.5 删除流程定义
 
-- **接口**: `DELETE /api/v1/definition/:id`
+- **接口**: `POST /api/v1/definition/delete/:id`
 - **响应体**:
 
 ```json
@@ -338,7 +342,7 @@
 
 ### 3.4 删除实例
 
-- **接口**: `DELETE /api/v1/instance/:id`
+- **接口**: `POST /api/v1/instance/delete/:id`
 - **响应体**:
 
 ```json
@@ -358,7 +362,37 @@
 ### 4.1 任务详情
 
 - **接口**: `GET /api/v1/task/:id`
-- **响应**: `domain.TaskView`（`ID/TaskName/Status/ProcessTitle/SubmitterName/ArrivedAt`）
+- **响应**: `domain.TaskDetailView`（以 `process_tasks` 模型字段为主，补充流程标题与提交人）
+- **响应体**:
+
+```json
+{
+  "ID": 200,
+  "InstanceID": 100,
+  "ExecutionID": 50,
+  "NodeID": "manager_review",
+  "Type": "user_task",
+  "Assignee": "1980531045852420096",
+  "Candidates": ["1980531045852420096"],
+  "Status": "PENDING",
+  "Action": "",
+  "Comment": "",
+  "FormData": [
+    {
+      "id": "days",
+      "label": "days",
+      "type": "number",
+      "value": 3
+    }
+  ],
+  "CreatedAt": "2026-04-21T13:00:00+08:00",
+  "UpdatedAt": "2026-04-21T13:00:00+08:00",
+  "CreatedBy": "",
+  "UpdatedBy": "",
+  "ProcessTitle": "请假审批流程",
+  "SubmitterID": "1980531045852420096"
+}
+```
 - **代码位置**:
   - Handler: `api/workflow/task_handler.go#Detail`
   - Service: `internal/workflow/service/task_service.go#GetTaskDetailView`

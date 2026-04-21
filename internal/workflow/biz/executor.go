@@ -10,7 +10,6 @@ import (
 type Node interface {
 	ID() string
 	Type() string
-	AutoAdvance() bool
 	Handle(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) (*domain.ProcessTask, error)
 }
 
@@ -41,16 +40,16 @@ func NewDefaultNodeRegistry(deps NodeDeps, features NodeFeatures) NodeRegistry {
 			return newEndNode(node, deps.ExecutionRepo, deps.InstanceRepo)
 		},
 		domain.NodeTypeForkGateway: func(node *domain.NodeModel) (Node, error) {
-			return newForkGatewayNode(node, deps.TaskRepo)
+			return newForkGatewayNode(node)
 		},
 		domain.NodeTypeJoinGateway: func(node *domain.NodeModel) (Node, error) {
-			return newJoinGatewayNode(node, deps.TaskRepo)
+			return newJoinGatewayNode(node)
 		},
 		domain.NodeTypeXORGateway: func(node *domain.NodeModel) (Node, error) {
-			return newXorGatewayNode(node, deps.TaskRepo)
+			return newXorGatewayNode(node)
 		},
 		domain.NodeTypeInclusiveGateway: func(node *domain.NodeModel) (Node, error) {
-			return newInclusiveGatewayNode(node, deps.TaskRepo)
+			return newInclusiveGatewayNode(node)
 		},
 	}
 	if features.EmailServiceEnabled {

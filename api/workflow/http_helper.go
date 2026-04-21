@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -19,4 +20,16 @@ func writeInternalError(c *gin.Context, logger *zap.Logger, message string, err 
 
 func writeUnauthorized(c *gin.Context) {
 	c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+}
+
+func getUIDFromCtx(c *gin.Context) (string, error) {
+	value, ok := c.Get("uid")
+	if !ok {
+		return "", fmt.Errorf("uid not found in context")
+	}
+	uid, ok := value.(string)
+	if !ok || uid == "" {
+		return "", fmt.Errorf("uid in context is invalid")
+	}
+	return uid, nil
 }

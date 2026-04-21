@@ -33,10 +33,10 @@ func (h *ProcessDefinitionHandler) Register(rg *gin.RouterGroup) {
 	r.GET(":id", h.Detail)
 
 	// 编辑流程模板
-	r.PUT(":id", h.Update)
+	r.POST("update", h.Update)
 
 	// 删除流程模板
-	r.DELETE(":id", h.Delete)
+	r.POST("delete/:id", h.Delete)
 }
 
 func (h *ProcessDefinitionHandler) Create(c *gin.Context) {
@@ -109,10 +109,6 @@ func (h *ProcessDefinitionHandler) Delete(c *gin.Context) {
 
 func (h *ProcessDefinitionHandler) Update(c *gin.Context) {
 	req := new(ProcessDefinitionUpdateReq)
-	if err := c.ShouldBindUri(req); err != nil {
-		writeBindError(c, h.logger, "failed to bind ProcessDefinitionUpdateReq uri", err)
-		return
-	}
 	if err := c.ShouldBindJSON(req); err != nil {
 		writeBindError(c, h.logger, "failed to bind ProcessDefinitionUpdateReq body", err)
 		return
@@ -222,6 +218,6 @@ type ProcessDefinitionDeleteReq struct {
 }
 
 type ProcessDefinitionUpdateReq struct {
-	ID int64 `uri:"id" binding:"required,min=1"` // 流程模板ID
+	ID int64 `json:"id" binding:"required,min=1"` // 流程模板ID
 	ProcessDefinitionCreateReq
 }

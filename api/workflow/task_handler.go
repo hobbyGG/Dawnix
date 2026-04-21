@@ -44,6 +44,13 @@ func (h *TaskHandler) Detail(c *gin.Context) {
 
 func (h *TaskHandler) List(c *gin.Context) {
 	// 处理获取任务列表的请求
+	uid, err := getUIDFromCtx(c)
+	if err != nil {
+		h.logger.Error("failed to get uid from context", zap.Error(err))
+		writeUnauthorized(c)
+		return
+	}
+
 	req := new(ListTasksReq)
 	if err := c.ShouldBindQuery(req); err != nil {
 		writeBindError(c, h.logger, "failed to bind ListTasksReq", err)
@@ -57,7 +64,9 @@ func (h *TaskHandler) List(c *gin.Context) {
 		req.Size = 10
 	}
 
-	taskListView, total, err := h.svc.ListTasksView(c.Request.Context(), req.ToBizParams())
+	params := req.ToBizParams()
+	params.UserID = uid
+	taskListView, total, err := h.svc.ListTasksView(c.Request.Context(), params)
 	if err != nil {
 		writeInternalError(c, h.logger, "failed to list tasks", err)
 		return
@@ -67,9 +76,15 @@ func (h *TaskHandler) List(c *gin.Context) {
 
 func (h *TaskHandler) Complete(c *gin.Context) {
 	// 处理完成任务的请求
+	uid, err := getUIDFromCtx(c)
+	if err != nil {
+		h.logger.Error("failed to get uid from context", zap.Error(err))
+		writeUnauthorized(c)
+		return
+	}
+
 	req := new(CompleteTaskReq)
 	if idStr, exist := c.Params.Get("id"); exist {
-		var err error
 		req.ID, err = strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid task id"})
@@ -81,7 +96,9 @@ func (h *TaskHandler) Complete(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.CompleteTask(c.Request.Context(), req.ToBizParams()); err != nil {
+	params := req.ToBizParams()
+	params.UserID = uid
+	if err := h.svc.CompleteTask(c.Request.Context(), params); err != nil {
 		writeInternalError(c, h.logger, "failed to complete task", err)
 		return
 	}

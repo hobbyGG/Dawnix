@@ -24,18 +24,27 @@ func (h *InstanceHandler) Register(rg *gin.RouterGroup) {
 	r.POST("create", h.Create)
 	r.GET("list", h.List)
 	r.GET(":id", h.Detail)
-	r.DELETE(":id", h.Delete)
+	r.POST("delete/:id", h.Delete)
 }
 
 func (h *InstanceHandler) Create(c *gin.Context) {
 	// 处理创建实例的请求
+	uid, err := getUIDFromCtx(c)
+	if err != nil {
+		h.logger.Error("failed to get uid from context", zap.Error(err))
+		writeUnauthorized(c)
+		return
+	}
+
 	req := new(CreateInstanceReq)
 	if err := c.ShouldBindJSON(req); err != nil {
 		writeBindError(c, h.logger, "failed to bind CreateInstanceReq", err)
 		return
 	}
+	params := req.ToBizParams()
+	params.SubmitterID = uid
 
-	id, err := h.svc.CreateInstance(c.Request.Context(), req.ToBizParams())
+	id, err := h.svc.CreateInstance(c.Request.Context(), params)
 	if err != nil {
 		writeInternalError(c, h.logger, "failed to create instance", err)
 		return

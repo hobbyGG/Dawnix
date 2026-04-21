@@ -46,3 +46,24 @@ type TaskView struct {
 	SubmitterName string
 	ArrivedAt     time.Time
 }
+
+type TaskDetailView struct {
+	ID          int64
+	InstanceID  int64
+	ExecutionID int64
+	NodeID      string
+	Type        string
+	Assignee    string
+	Candidates  []string
+	Status      string
+	Action      string
+	Comment     string
+	FormData    datatypes.JSON
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	CreatedBy   string
+	UpdatedBy   string
+
+	ProcessTitle string
+	SubmitterID  string
+}

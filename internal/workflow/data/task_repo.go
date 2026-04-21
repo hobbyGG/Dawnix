@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	dataModel "github.com/hobbyGG/Dawnix/internal/workflow/data/model"
@@ -24,7 +25,7 @@ var _ biz.TaskRepo = (*TaskRepo)(nil)
 func (repo *TaskRepo) Create(ctx context.Context, task *domain.ProcessTask) error {
 	poTask := processTaskToPO(task)
 	if err := repo.db.DB(ctx).WithContext(ctx).Create(poTask).Error; err != nil {
-		return err
+		return fmt.Errorf("create process task: %w", err)
 	}
 	task.ID = poTask.ID
 	return nil
@@ -33,40 +34,56 @@ func (repo *TaskRepo) Create(ctx context.Context, task *domain.ProcessTask) erro
 func (r *TaskRepo) GetByID(ctx context.Context, taskID int64) (*domain.ProcessTask, error) {
 	var task dataModel.ProcessTask
 	err := r.db.DB(ctx).WithContext(ctx).First(&task, taskID).Error
-	return task.ToDomain(), err
+	if err != nil {
+		return nil, fmt.Errorf("get process task by id %d: %w", taskID, err)
+	}
+	return task.ToDomain(), nil
 }
 
-func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*domain.TaskView, error) {
-	var result domain.TaskView
+func (r *TaskRepo) GetDetailView(ctx context.Context, taskID int64) (*domain.TaskDetailView, error) {
+	var task dataModel.ProcessTask
+	if err := r.db.DB(ctx).WithContext(ctx).First(&task, taskID).Error; err != nil {
+		return nil, fmt.Errorf("get process task for detail by id %d: %w", taskID, err)
+	}
+
+	type taskDetailJoin struct {
+		ProcessTitle string
+		SubmitterID  string
+	}
+	var join taskDetailJoin
 
 	err := r.db.DB(ctx).WithContext(ctx).Table("process_tasks as t").
 		Select(`
-			t.id as id,
-			t.node_id as node_name,
-			t.status,
-			t.assignee,
-			t.candidates,
-			t.action,
-			t.comment,
-			t.form_data,  -- 详情页需要这个大 JSON
-			t.created_at as create_time,
-			t.finished_at,
-
 			d.name as process_title,
-			d.code as process_code,
-
-			i.id as instance_id,
-			i.submitter_id as submitter_name
+			i.submitter_id as submitter_id
 		`).
 		Joins("LEFT JOIN process_instances i ON t.instance_id = i.id").
 		Joins("LEFT JOIN process_definitions d ON i.definition_id = d.id").
 		Where("t.id = ?", taskID).
-		Scan(&result).Error
+		Scan(&join).Error
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get task detail view by id %d: %w", taskID, err)
 	}
-	return &result, nil
+	return &domain.TaskDetailView{
+		ID:           task.ID,
+		InstanceID:   task.InstanceID,
+		ExecutionID:  task.ExecutionID,
+		NodeID:       task.NodeID,
+		Type:         task.Type,
+		Assignee:     task.Assignee,
+		Candidates:   []string(task.Candidates),
+		Status:       task.Status,
+		Action:       task.Action,
+		Comment:      task.Comment,
+		FormData:     task.FormData,
+		CreatedAt:    task.CreatedAt,
+		UpdatedAt:    task.UpdatedAt,
+		CreatedBy:    task.CreatedBy,
+		UpdatedBy:    task.UpdatedBy,
+		ProcessTitle: join.ProcessTitle,
+		SubmitterID:  join.SubmitterID,
+	}, nil
 }
 
 func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksParams) ([]*domain.TaskView, int64, error) {
@@ -97,7 +114,7 @@ func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksPara
 	// 4. 获取总数 (Count)
 	// 注意：Count 必须在 Limit/Offset 之前
 	if err := db.Count(&total).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("count task views: %w", err)
 	}
 
 	// 5. 执行分页与字段投影
@@ -117,12 +134,15 @@ func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksPara
 		Offset(offset).Limit(params.Size).
 		Scan(&results).Error
 
-	return results, total, err
+	if err != nil {
+		return nil, 0, fmt.Errorf("list task views: %w", err)
+	}
+	return results, total, nil
 }
 
 func (repo *TaskRepo) Update(ctx context.Context, task *domain.ProcessTask) error {
 	if err := repo.db.DB(ctx).WithContext(ctx).Save(processTaskToPO(task)).Error; err != nil {
-		return err
+		return fmt.Errorf("update process task id %d: %w", task.ID, err)
 	}
 	return nil
 }
