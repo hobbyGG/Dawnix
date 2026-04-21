@@ -2,6 +2,7 @@ package model
 
 import (
 	domain "github.com/hobbyGG/Dawnix/internal/workflow/domain"
+	"github.com/lib/pq"
 	"gorm.io/datatypes"
 )
 
@@ -13,12 +14,12 @@ type ProcessTask struct {
 	NodeID      string         `gorm:"type:varchar(64);index"`
 	Type        string         `gorm:"type:varchar(32);default:'user_task'"`
 	Assignee    string         `gorm:"type:varchar(64);index"`
-	Candidates  []string       `gorm:"type:json"`
+	Candidates  pq.StringArray `gorm:"type:varchar(255)[]"`
 	Status      string         `gorm:"type:varchar(32);default:'PENDING';index"`
 	Action      string         `gorm:"type:varchar(32)"`
 	Comment     string         `gorm:"type:text"`
 	FormData    datatypes.JSON `gorm:"type:jsonb;column:form_data;default:'{}'" json:"form_data"`
-}	
+}
 
 func (ProcessTask) TableName() string {
 	return "process_tasks"
@@ -41,7 +42,7 @@ func (p *ProcessTask) ToDomain() *domain.ProcessTask {
 		NodeID:      p.NodeID,
 		Type:        p.Type,
 		Assignee:    p.Assignee,
-		Candidates:  p.Candidates,
+		Candidates:  []string(p.Candidates),
 		Status:      p.Status,
 		Action:      p.Action,
 		Comment:     p.Comment,

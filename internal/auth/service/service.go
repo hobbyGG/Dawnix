@@ -57,6 +57,11 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+type UserOption struct {
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+}
+
 func NewService(repo authBiz.Repo, cfg Config, logger *zap.Logger) (*Service, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("auth repo is nil")
@@ -217,4 +222,20 @@ func (s *Service) ParseToken(tokenString string) (*Claims, error) {
 		return nil, fmt.Errorf("token uid is empty")
 	}
 	return claims, nil
+}
+
+func (s *Service) SearchActiveUsers(ctx context.Context, keyword string, limit int) ([]*UserOption, error) {
+	users, err := s.repo.SearchActiveUsers(ctx, keyword, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search active users failed: %w", err)
+	}
+
+	result := make([]*UserOption, 0, len(users))
+	for _, user := range users {
+		result = append(result, &UserOption{
+			UserID:      user.UserID,
+			DisplayName: user.DisplayName,
+		})
+	}
+	return result, nil
 }

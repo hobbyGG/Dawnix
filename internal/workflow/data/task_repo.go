@@ -2,11 +2,11 @@ package data
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	dataModel "github.com/hobbyGG/Dawnix/internal/workflow/data/model"
 	domain "github.com/hobbyGG/Dawnix/internal/workflow/domain"
+	"github.com/lib/pq"
 )
 
 type TaskRepo struct {
@@ -86,15 +86,11 @@ func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksPara
 
 	// 3. 身份匹配 (核心修正)
 	if params.UserID != "" {
-		// 构造 JSON 数组字符串 ["user:123"]
-		userJSON := fmt.Sprintf("[%q]", params.UserID)
-
 		// 逻辑：Assignee 是我 OR (Assignee 为空/NULL AND 我在候选人数组里)
-		// 注意：candidates 列是 json 类型，需转为 jsonb 后再使用 @>。
 		db = db.Where(
-			"t.assignee = ? OR ((t.assignee = '' OR t.assignee IS NULL) AND t.candidates::jsonb @> ?::jsonb)",
+			"t.assignee = ? OR ((t.assignee = '' OR t.assignee IS NULL) AND t.candidates @> ?)",
 			params.UserID,
-			userJSON,
+			pq.StringArray{params.UserID},
 		)
 	}
 
@@ -148,7 +144,7 @@ func processTaskToPO(src *domain.ProcessTask) *dataModel.ProcessTask {
 		NodeID:      src.NodeID,
 		Type:        src.Type,
 		Assignee:    src.Assignee,
-		Candidates:  src.Candidates,
+		Candidates:  pq.StringArray(src.Candidates),
 		Status:      src.Status,
 		Action:      src.Action,
 		Comment:     src.Comment,

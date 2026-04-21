@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hobbyGG/Dawnix/api/workflow/middleware"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 	"github.com/hobbyGG/Dawnix/internal/workflow/service"
@@ -23,7 +22,7 @@ func NewProcessDefinitionHandler(svc *service.ProcessDefinitionService, logger *
 
 func (h *ProcessDefinitionHandler) Register(rg *gin.RouterGroup) {
 	// 这里注册ProcessDefinition相关的路由
-	r := rg.Group("definition", middleware.InjectUID())
+	r := rg.Group("definition")
 	// 创建流程模板
 	r.POST("create", h.Create)
 
@@ -48,7 +47,7 @@ func (h *ProcessDefinitionHandler) Create(c *gin.Context) {
 		return
 	}
 
-	id, err := h.svc.CreateProcessDefinition(c, req.ToBizParams())
+	id, err := h.svc.CreateProcessDefinition(c.Request.Context(), req.ToBizParams())
 	if err != nil {
 		writeInternalError(c, h.logger, "failt to CreateProcessDefinition", err)
 		return
@@ -65,7 +64,7 @@ func (h *ProcessDefinitionHandler) List(c *gin.Context) {
 		return
 	}
 
-	pdList, err := h.svc.ListProcessDefinitions(c, req.ToBizParams())
+	pdList, err := h.svc.ListProcessDefinitions(c.Request.Context(), req.ToBizParams())
 	if err != nil {
 		writeInternalError(c, h.logger, "failt to ListProcessDefinitions", err)
 		return
@@ -85,7 +84,7 @@ func (h *ProcessDefinitionHandler) Detail(c *gin.Context) {
 		writeBindError(c, h.logger, "failed to bind ProcessDefinitionDetailReq", err)
 		return
 	}
-	pdDetail, err := h.svc.GetProcessDefinitionDetail(c, req.ID)
+	pdDetail, err := h.svc.GetProcessDefinitionDetail(c.Request.Context(), req.ID)
 	if err != nil {
 		writeInternalError(c, h.logger, "fail to GetProcessDefinitionDetail", err)
 		return
@@ -101,7 +100,7 @@ func (h *ProcessDefinitionHandler) Delete(c *gin.Context) {
 		return
 	}
 	// 处理删除流程模板的请求
-	if err := h.svc.DeleteProcessDefinition(c, req.ID); err != nil {
+	if err := h.svc.DeleteProcessDefinition(c.Request.Context(), req.ID); err != nil {
 		writeInternalError(c, h.logger, "fail to DeleteProcessDefinition", err)
 		return
 	}
@@ -118,7 +117,7 @@ func (h *ProcessDefinitionHandler) Update(c *gin.Context) {
 		writeBindError(c, h.logger, "failed to bind ProcessDefinitionUpdateReq body", err)
 		return
 	}
-	if err := h.svc.UpdateProcessDefinition(c, req.ID, req.ProcessDefinitionCreateReq.ToBizParams()); err != nil {
+	if err := h.svc.UpdateProcessDefinition(c.Request.Context(), req.ID, req.ProcessDefinitionCreateReq.ToBizParams()); err != nil {
 		writeInternalError(c, h.logger, "fail to UpdateProcessDefinition", err)
 		return
 	}

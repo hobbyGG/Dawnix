@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS dawnix_process_task (
     node_id VARCHAR(255),
     type VARCHAR(50) DEFAULT 'user_task',
     assignee VARCHAR(255),
-    candidates JSONB,
+    candidates VARCHAR(255)[] DEFAULT '{}'::varchar(255)[],
     status VARCHAR(50) DEFAULT 'PENDING',
     action VARCHAR(50),
     comment TEXT,

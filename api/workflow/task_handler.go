@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hobbyGG/Dawnix/api/workflow/middleware"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/service"
 	"go.uber.org/zap"
@@ -22,7 +21,7 @@ func NewTaskHandler(svc *service.TaskService, logger *zap.Logger) *TaskHandler {
 
 func (h *TaskHandler) Register(rg *gin.RouterGroup) {
 	// 在这里注册Task相关的路由
-	r := rg.Group("task", middleware.InjectUID())
+	r := rg.Group("task")
 	r.GET(":id", h.Detail)
 	r.GET("list", h.List)
 	r.POST("complete/:id", h.Complete)

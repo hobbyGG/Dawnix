@@ -109,7 +109,6 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 
 	processDefinitionSvc := service.NewProcessDefinitionService(processDefinitionRepo, logger, cfg.Biz.Features.EmailService.Enabled)
 	processDefinitionHandler := workflow.NewProcessDefinitionHandler(processDefinitionSvc, logger)
-	enumHandler := workflow.NewEnumHandler(cfg.Biz.Features.EmailService.Enabled)
 
 	instanceSvc := service.NewInstanceService(instanceRepo, scheduler, logger)
 	instanceHandler := workflow.NewInstanceHandler(instanceSvc, logger)
@@ -126,6 +125,7 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 		return nil, fmt.Errorf("fail to initialize auth service: %w", err)
 	}
 	authHandler := authAPI.NewHandler(authSvc, logger)
+	enumHandler := workflow.NewEnumHandler(cfg.Biz.Features.EmailService.Enabled, authSvc)
 	authMiddleware := authService.JWTMiddleware(authSvc)
 
 	// 允许跨域中间件配置

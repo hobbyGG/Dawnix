@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hobbyGG/Dawnix/api/workflow/middleware"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/service"
 	"go.uber.org/zap"
@@ -21,7 +20,7 @@ func NewInstanceHandler(svc *service.InstanceService, logger *zap.Logger) *Insta
 
 func (h *InstanceHandler) Register(rg *gin.RouterGroup) {
 	// 在这里注册Instance相关的路由
-	r := rg.Group("instance", middleware.InjectUID())
+	r := rg.Group("instance")
 	r.POST("create", h.Create)
 	r.GET("list", h.List)
 	r.GET(":id", h.Detail)
@@ -36,7 +35,7 @@ func (h *InstanceHandler) Create(c *gin.Context) {
 		return
 	}
 
-	id, err := h.svc.CreateInstance(c, req.ToBizParams())
+	id, err := h.svc.CreateInstance(c.Request.Context(), req.ToBizParams())
 	if err != nil {
 		writeInternalError(c, h.logger, "failed to create instance", err)
 		return
@@ -51,7 +50,7 @@ func (h *InstanceHandler) List(c *gin.Context) {
 		writeBindError(c, h.logger, "failed to bind ListInstancesReq", err)
 		return
 	}
-	instances, err := h.svc.ListInstances(c, req.ToBizParams())
+	instances, err := h.svc.ListInstances(c.Request.Context(), req.ToBizParams())
 	if err != nil {
 		writeInternalError(c, h.logger, "failed to list instances", err)
 		return
@@ -66,7 +65,7 @@ func (h *InstanceHandler) Detail(c *gin.Context) {
 		writeBindError(c, h.logger, "failed to bind GetInstanceDetailReq", err)
 		return
 	}
-	instance, err := h.svc.GetInstanceDetail(c, req.ID)
+	instance, err := h.svc.GetInstanceDetail(c.Request.Context(), req.ID)
 	if err != nil {
 		writeInternalError(c, h.logger, "failed to get instance detail", err)
 		return
@@ -81,7 +80,7 @@ func (h *InstanceHandler) Delete(c *gin.Context) {
 		writeBindError(c, h.logger, "failed to bind DeleteInstanceReq", err)
 		return
 	}
-	if err := h.svc.DeleteInstance(c, req.ID); err != nil {
+	if err := h.svc.DeleteInstance(c.Request.Context(), req.ID); err != nil {
 		writeInternalError(c, h.logger, "failed to delete instance", err)
 		return
 	}

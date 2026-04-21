@@ -39,6 +39,7 @@
 | POST | `/auth/logout` | 否 | `api/auth/handler.go` |
 | GET | `/enum/node-types` | 是 | `api/workflow/enum.go` |
 | GET | `/enum/form-types` | 是 | `api/workflow/enum.go` |
+| GET | `/enum/approvers` | 是 | `api/workflow/enum.go` |
 | POST | `/definition/create` | 是 | `api/workflow/process_definition_handler.go` |
 | GET | `/definition/list` | 是 | `api/workflow/process_definition_handler.go` |
 | GET | `/definition/:id` | 是 | `api/workflow/process_definition_handler.go` |
@@ -144,6 +145,31 @@
 - **接口**: `GET /api/v1/enum/form-types`
 - **响应**: `{"list":[{"label":"单行文本","value":"text_single_line"}, ...]}`
 - **代码位置**: `api/workflow/enum.go#FormTypes`
+
+### 1.3 获取审批人枚举（支持模糊搜索）
+
+- **接口**: `GET /api/v1/enum/approvers?keyword=张&limit=20`
+- **参数**:
+  - `keyword` 可选：按 `display_name` / `user_id` 模糊搜索
+  - `limit` 可选：返回条数，范围 `1~100`，默认 `20`
+- **响应**:
+
+```json
+{
+  "list": [
+    {
+      "label": "张三",
+      "value": "1980531045852420096"
+    }
+  ]
+}
+```
+
+- **说明**:
+  1. 仅返回 `ACTIVE` 用户
+  2. `label` 为展示名，`value` 为 `uid`
+  3. 推荐在前端审批人选择器中远程搜索并提交 `uid[]`
+- **代码位置**: `api/workflow/enum.go#Approvers`
 
 ---
 
@@ -438,6 +464,9 @@
 
 请求体（Definition Create/Update）里的 `structure.edges` 字段使用 `source/target`。  
 落库后领域模型中的边字段为 `source_node/target_node`（`internal/workflow/domain/workflow.go`）。
+
+用户任务节点的审批人配置在 `structure.nodes[].candidates.users`，元素必须是 `uid` 字符串数组。  
+建议通过 `GET /api/v1/enum/approvers` 获取前端展示用枚举（`label=姓名`，`value=uid`），提交时仅传 `uid`。
 
 ---
 

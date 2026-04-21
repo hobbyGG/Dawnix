@@ -27,6 +27,34 @@ func (r *Repo) GetUserByID(ctx context.Context, userID string) (*authBiz.User, e
 	return userToDomain(&user), nil
 }
 
+func (r *Repo) SearchActiveUsers(ctx context.Context, keyword string, limit int) ([]*authBiz.User, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	query := r.db.DB(ctx).WithContext(ctx).
+		Model(&authModel.User{}).
+		Where("status = ?", authBiz.UserStatusActive)
+	if keyword != "" {
+		likeValue := "%" + keyword + "%"
+		query = query.Where("display_name ILIKE ? OR user_id ILIKE ?", likeValue, likeValue)
+	}
+
+	var users []authModel.User
+	if err := query.Order("display_name ASC, user_id ASC").Limit(limit).Find(&users).Error; err != nil {
+		return nil, fmt.Errorf("search active users failed: %w", err)
+	}
+
+	result := make([]*authBiz.User, 0, len(users))
+	for i := range users {
+		result = append(result, userToDomain(&users[i]))
+	}
+	return result, nil
+}
+
 func (r *Repo) GetIdentityByProviderAndSub(ctx context.Context, provider string, providerSub string) (*authBiz.AuthIdentity, error) {
 	var identity authModel.AuthIdentity
 	err := r.db.DB(ctx).WithContext(ctx).
