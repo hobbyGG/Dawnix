@@ -7,15 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const currentUserIDGinKey = "current_user_id"
-
 func JWTMiddleware(authService *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.Method == http.MethodOptions {
-			c.Next()
-			return
-		}
-		if c.Request.URL.Path == "/api/v1/auth/signin" || c.Request.URL.Path == "/api/v1/auth/signup" {
+		if shouldSkipJWT(c) {
 			c.Next()
 			return
 		}
@@ -31,21 +25,19 @@ func JWTMiddleware(authService *Service) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			return
 		}
-		c.Set(currentUserIDGinKey, claims.UserID)
 		ctx := WithUserID(c.Request.Context(), claims.UserID)
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
 }
 
-func UserIDFromGin(c *gin.Context) (string, bool) {
-	value, ok := c.Get(currentUserIDGinKey)
-	if !ok {
-		return "", false
+func shouldSkipJWT(c *gin.Context) bool {
+	if c.Request.Method == http.MethodOptions {
+		return true
 	}
-	userID, ok := value.(string)
-	if !ok || userID == "" {
-		return "", false
+	fullPath := c.FullPath()
+	if fullPath == "" {
+		fullPath = c.Request.URL.Path
 	}
-	return userID, true
+	return strings.HasPrefix(fullPath, "/api/v1/auth/")
 }

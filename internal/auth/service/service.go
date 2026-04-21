@@ -27,6 +27,7 @@ type Service struct {
 }
 
 var ErrUsernameAlreadyExists = errors.New("username already exists")
+var ErrInvalidCredentials = errors.New("invalid username or password")
 
 type RegisterParams struct {
 	Username    string
@@ -56,11 +57,26 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func NewService(repo authBiz.Repo, cfg Config, logger *zap.Logger) *Service {
+func NewService(repo authBiz.Repo, cfg Config, logger *zap.Logger) (*Service, error) {
+	if repo == nil {
+		return nil, fmt.Errorf("auth repo is nil")
+	}
+	if cfg.JWTSecret == "" {
+		return nil, fmt.Errorf("jwt secret is required")
+	}
+	if len(cfg.JWTSecret) < 16 {
+		return nil, fmt.Errorf("jwt secret must be at least 16 characters")
+	}
+	if cfg.JWTIssuer == "" {
+		return nil, fmt.Errorf("jwt issuer is required")
+	}
 	if cfg.JWTExpireMinutes <= 0 {
 		cfg.JWTExpireMinutes = 120
 	}
-	return &Service{repo: repo, cfg: cfg, logger: logger}
+	if cfg.JWTSecret == "dawnix-dev-jwt-secret" && logger != nil {
+		logger.Warn("using default development JWT secret")
+	}
+	return &Service{repo: repo, cfg: cfg, logger: logger}, nil
 }
 
 func (s *Service) Register(ctx context.Context, params *RegisterParams) (*RegisterResult, error) {
@@ -122,23 +138,23 @@ func (s *Service) Login(ctx context.Context, params *LoginParams) (*LoginResult,
 	identity, err := s.repo.GetIdentityByProviderAndSub(ctx, authBiz.ProviderLocalPassword, params.Username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("invalid username or password")
+			return nil, ErrInvalidCredentials
 		}
 		return nil, fmt.Errorf("get auth identity failed: %w", err)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(identity.CredentialHash), []byte(params.Password)); err != nil {
-		return nil, fmt.Errorf("invalid username or password")
+		return nil, ErrInvalidCredentials
 	}
 
 	user, err := s.repo.GetUserByID(ctx, identity.UserID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("user not found")
+			return nil, ErrInvalidCredentials
 		}
 		return nil, fmt.Errorf("get user failed: %w", err)
 	}
 	if user.Status != authBiz.UserStatusActive {
-		return nil, fmt.Errorf("user is not active")
+		return nil, ErrInvalidCredentials
 	}
 
 	now := time.Now()
@@ -170,11 +186,6 @@ func (s *Service) Login(ctx context.Context, params *LoginParams) (*LoginResult,
 	}, nil
 }
 
-func (s *Service) Logout(ctx context.Context) error {
-	_ = ctx
-	return nil
-}
-
 func (s *Service) ParseToken(tokenString string) (*Claims, error) {
 	if tokenString == "" {
 		return nil, fmt.Errorf("token is required")
@@ -193,8 +204,17 @@ func (s *Service) ParseToken(tokenString string) (*Claims, error) {
 	if !token.Valid {
 		return nil, fmt.Errorf("invalid token")
 	}
+	if claims.Issuer != s.cfg.JWTIssuer {
+		return nil, fmt.Errorf("invalid token issuer")
+	}
 	if claims.Subject == "" {
 		return nil, fmt.Errorf("token subject is empty")
+	}
+	if claims.UserID == "" {
+		claims.UserID = claims.Subject
+	}
+	if claims.UserID == "" {
+		return nil, fmt.Errorf("token uid is empty")
 	}
 	return claims, nil
 }

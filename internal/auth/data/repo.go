@@ -24,13 +24,7 @@ func (r *Repo) GetUserByID(ctx context.Context, userID string) (*authBiz.User, e
 	if err := r.db.DB(ctx).WithContext(ctx).First(&user, "user_id = ?", userID).Error; err != nil {
 		return nil, fmt.Errorf("get user by id failed: %w", err)
 	}
-	return &authBiz.User{
-		UserID:      user.UserID,
-		DisplayName: user.DisplayName,
-		Status:      user.Status,
-		CreatedAt:   user.CreatedAt,
-		UpdatedAt:   user.UpdatedAt,
-	}, nil
+	return userToDomain(&user), nil
 }
 
 func (r *Repo) GetIdentityByProviderAndSub(ctx context.Context, provider string, providerSub string) (*authBiz.AuthIdentity, error) {
@@ -41,14 +35,7 @@ func (r *Repo) GetIdentityByProviderAndSub(ctx context.Context, provider string,
 	if err != nil {
 		return nil, fmt.Errorf("get identity by provider and subject failed: %w", err)
 	}
-	return &authBiz.AuthIdentity{
-		ID:             identity.ID,
-		UserID:         identity.UserID,
-		Provider:       identity.Provider,
-		ProviderSub:    identity.ProviderSub,
-		CredentialHash: identity.CredentialHash,
-		LastLoginAt:    identity.LastLoginAt,
-	}, nil
+	return identityToDomain(&identity), nil
 }
 
 func (r *Repo) CreateUserAndIdentity(ctx context.Context, user *authBiz.User, identity *authBiz.AuthIdentity) error {
@@ -59,23 +46,14 @@ func (r *Repo) CreateUserAndIdentity(ctx context.Context, user *authBiz.User, id
 		return fmt.Errorf("identity is nil")
 	}
 
-	userPO := authModel.User{
-		UserID:      user.UserID,
-		DisplayName: user.DisplayName,
-		Status:      user.Status,
-	}
-	identityPO := authModel.AuthIdentity{
-		UserID:         identity.UserID,
-		Provider:       identity.Provider,
-		ProviderSub:    identity.ProviderSub,
-		CredentialHash: identity.CredentialHash,
-	}
+	userPO := userToPO(user)
+	identityPO := identityToPO(identity)
 
 	if err := r.db.DB(ctx).WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&userPO).Error; err != nil {
+		if err := tx.Create(userPO).Error; err != nil {
 			return fmt.Errorf("create user failed: %w", err)
 		}
-		if err := tx.Create(&identityPO).Error; err != nil {
+		if err := tx.Create(identityPO).Error; err != nil {
 			return fmt.Errorf("create identity failed: %w", err)
 		}
 		return nil
@@ -83,6 +61,56 @@ func (r *Repo) CreateUserAndIdentity(ctx context.Context, user *authBiz.User, id
 		return fmt.Errorf("create user and identity failed: %w", err)
 	}
 	return nil
+}
+
+func userToDomain(user *authModel.User) *authBiz.User {
+	if user == nil {
+		return nil
+	}
+	return &authBiz.User{
+		UserID:      user.UserID,
+		DisplayName: user.DisplayName,
+		Status:      user.Status,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+	}
+}
+
+func identityToDomain(identity *authModel.AuthIdentity) *authBiz.AuthIdentity {
+	if identity == nil {
+		return nil
+	}
+	return &authBiz.AuthIdentity{
+		ID:             identity.ID,
+		UserID:         identity.UserID,
+		Provider:       identity.Provider,
+		ProviderSub:    identity.ProviderSub,
+		CredentialHash: identity.CredentialHash,
+		LastLoginAt:    identity.LastLoginAt,
+	}
+}
+
+func userToPO(user *authBiz.User) *authModel.User {
+	if user == nil {
+		return nil
+	}
+	return &authModel.User{
+		UserID:      user.UserID,
+		DisplayName: user.DisplayName,
+		Status:      user.Status,
+	}
+}
+
+func identityToPO(identity *authBiz.AuthIdentity) *authModel.AuthIdentity {
+	if identity == nil {
+		return nil
+	}
+	return &authModel.AuthIdentity{
+		UserID:         identity.UserID,
+		Provider:       identity.Provider,
+		ProviderSub:    identity.ProviderSub,
+		CredentialHash: identity.CredentialHash,
+	}
 }
 
 func (r *Repo) UpdateIdentityLastLogin(ctx context.Context, id int64, loginAtUnix int64) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	authService "github.com/hobbyGG/Dawnix/internal/auth/service"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 	"go.uber.org/zap"
@@ -20,8 +21,18 @@ func NewInstanceService(instanceRepo biz.InstanceRepo, scheduler biz.InstanceSch
 }
 
 func (s *InstanceService) CreateInstance(ctx context.Context, params *biz.StartProcessInstanceParams) (int64, error) {
-	// 业务校验
-	// 对params的一些字段进行业务上的校验
+	if params == nil {
+		return 0, fmt.Errorf("create instance params is nil")
+	}
+
+	// 参数预处理
+	if params.SubmitterID == "" {
+		uid, ok := authService.UserIDFromContext(ctx)
+		if !ok {
+			return 0, fmt.Errorf("user id is required")
+		}
+		params.SubmitterID = uid
+	}
 
 	// 启动一个流程实例
 	id, err := s.scheduler.StartProcessInstance(ctx, params)

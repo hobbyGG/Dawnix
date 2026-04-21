@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hobbyGG/Dawnix/api/workflow/middleware"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 	"github.com/hobbyGG/Dawnix/internal/workflow/service"
@@ -22,7 +23,7 @@ func NewProcessDefinitionHandler(svc *service.ProcessDefinitionService, logger *
 
 func (h *ProcessDefinitionHandler) Register(rg *gin.RouterGroup) {
 	// 这里注册ProcessDefinition相关的路由
-	r := rg.Group("definition")
+	r := rg.Group("definition", middleware.InjectUID())
 	// 创建流程模板
 	r.POST("create", h.Create)
 
@@ -43,15 +44,13 @@ func (h *ProcessDefinitionHandler) Create(c *gin.Context) {
 	// 处理创建流程模板的请求
 	req := new(ProcessDefinitionCreateReq)
 	if err := c.ShouldBindJSON(req); err != nil {
-		h.logger.Error("failed to bind ProcessDefinitionCreateReq", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind ProcessDefinitionCreateReq", err)
 		return
 	}
 
 	id, err := h.svc.CreateProcessDefinition(c, req.ToBizParams())
 	if err != nil {
-		h.logger.Error("failt to CreateProcessDefinition", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "failt to CreateProcessDefinition", err)
 		return
 	}
 	// 对响应进行封装
@@ -62,15 +61,13 @@ func (h *ProcessDefinitionHandler) List(c *gin.Context) {
 	// 处理获取流程模板列表的请求
 	req := new(ProcessDefinitionListReq)
 	if err := c.ShouldBind(req); err != nil {
-		h.logger.Error("failed to bind ProcessDefinitionListReq", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind ProcessDefinitionListReq", err)
 		return
 	}
 
 	pdList, err := h.svc.ListProcessDefinitions(c, req.ToBizParams())
 	if err != nil {
-		h.logger.Error("failt to ListProcessDefinitions", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "failt to ListProcessDefinitions", err)
 		return
 	}
 	// 对响应进行封装
@@ -85,14 +82,12 @@ func (h *ProcessDefinitionHandler) Detail(c *gin.Context) {
 	// 处理获取流程模板详情的请求
 	req := new(ProcessDefinitionDetailReq)
 	if err := c.ShouldBindUri(req); err != nil {
-		h.logger.Error("failed to bind ProcessDefinitionDetailReq", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind ProcessDefinitionDetailReq", err)
 		return
 	}
 	pdDetail, err := h.svc.GetProcessDefinitionDetail(c, req.ID)
 	if err != nil {
-		h.logger.Error("fail to GetProcessDefinitionDetail", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "fail to GetProcessDefinitionDetail", err)
 		return
 	}
 	// 对响应进行封装
@@ -102,14 +97,12 @@ func (h *ProcessDefinitionHandler) Detail(c *gin.Context) {
 func (h *ProcessDefinitionHandler) Delete(c *gin.Context) {
 	req := new(ProcessDefinitionDeleteReq)
 	if err := c.ShouldBindUri(req); err != nil {
-		h.logger.Error("failed to bind ProcessDefinitionDeleteReq", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind ProcessDefinitionDeleteReq", err)
 		return
 	}
 	// 处理删除流程模板的请求
 	if err := h.svc.DeleteProcessDefinition(c, req.ID); err != nil {
-		h.logger.Error("fail to DeleteProcessDefinition", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "fail to DeleteProcessDefinition", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "deleted success"})
@@ -118,18 +111,15 @@ func (h *ProcessDefinitionHandler) Delete(c *gin.Context) {
 func (h *ProcessDefinitionHandler) Update(c *gin.Context) {
 	req := new(ProcessDefinitionUpdateReq)
 	if err := c.ShouldBindUri(req); err != nil {
-		h.logger.Error("failed to bind ProcessDefinitionUpdateReq uri", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind ProcessDefinitionUpdateReq uri", err)
 		return
 	}
 	if err := c.ShouldBindJSON(req); err != nil {
-		h.logger.Error("failed to bind ProcessDefinitionUpdateReq body", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind ProcessDefinitionUpdateReq body", err)
 		return
 	}
 	if err := h.svc.UpdateProcessDefinition(c, req.ID, req.ProcessDefinitionCreateReq.ToBizParams()); err != nil {
-		h.logger.Error("fail to UpdateProcessDefinition", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "fail to UpdateProcessDefinition", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "updated success"})

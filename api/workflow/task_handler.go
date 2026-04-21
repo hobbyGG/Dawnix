@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	authService "github.com/hobbyGG/Dawnix/internal/auth/service"
+	"github.com/hobbyGG/Dawnix/api/workflow/middleware"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/service"
 	"go.uber.org/zap"
@@ -22,7 +22,7 @@ func NewTaskHandler(svc *service.TaskService, logger *zap.Logger) *TaskHandler {
 
 func (h *TaskHandler) Register(rg *gin.RouterGroup) {
 	// 在这里注册Task相关的路由
-	r := rg.Group("task")
+	r := rg.Group("task", middleware.InjectUID())
 	r.GET(":id", h.Detail)
 	r.GET("list", h.List)
 	r.POST("complete/:id", h.Complete)
@@ -32,13 +32,12 @@ func (h *TaskHandler) Detail(c *gin.Context) {
 	// 处理获取任务详情的请求
 	req := new(GetTaskDetailReq)
 	if err := c.ShouldBindUri(req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind GetTaskDetailReq", err)
 		return
 	}
 	taskDetailView, err := h.svc.GetTaskDetailView(c.Request.Context(), req.ID)
 	if err != nil {
-		h.logger.Error("failed to get task detail", zap.Error(err))
-		c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "failed to get task detail", err)
 		return
 	}
 	c.JSON(http.StatusOK, taskDetailView)
@@ -48,7 +47,7 @@ func (h *TaskHandler) List(c *gin.Context) {
 	// 处理获取任务列表的请求
 	req := new(ListTasksReq)
 	if err := c.ShouldBindQuery(req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind ListTasksReq", err)
 		return
 	}
 	// 默认分页参数
@@ -58,18 +57,10 @@ func (h *TaskHandler) List(c *gin.Context) {
 	if req.Size == 0 {
 		req.Size = 10
 	}
-	listTasksParams := req.ToBizParams()
-	userID, ok := authService.UserIDFromContext(c.Request.Context())
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	listTasksParams.UserID = userID
 
-	taskListView, total, err := h.svc.ListTasksView(c.Request.Context(), listTasksParams)
+	taskListView, total, err := h.svc.ListTasksView(c.Request.Context(), req.ToBizParams())
 	if err != nil {
-		h.logger.Error("failed to list tasks", zap.Error(err))
-		c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "failed to list tasks", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"total": total, "tasks": taskListView})
@@ -87,19 +78,12 @@ func (h *TaskHandler) Complete(c *gin.Context) {
 		}
 	}
 	if err := c.ShouldBindJSON(req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind CompleteTaskReq", err)
 		return
 	}
-	userID, ok := authService.UserIDFromContext(c.Request.Context())
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-		return
-	}
-	req.CurrentUserID = userID
 
 	if err := h.svc.CompleteTask(c.Request.Context(), req.ToBizParams()); err != nil {
-		h.logger.Error("failed to complete task", zap.Error(err))
-		c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "failed to complete task", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "success"})
@@ -136,15 +120,11 @@ type CompleteTaskReq struct {
 
 	// 表单数据: 比如请假表单里的实际数据，或者审批人填写的新字段
 	FormData []biz.FormDataItem `json:"form_data"`
-
-	// 当前操作人 (Middleware 注入)
-	CurrentUserID string `json:"-"`
 }
 
 func (req *CompleteTaskReq) ToBizParams() *biz.CompleteTaskParams {
 	return &biz.CompleteTaskParams{
 		TaskID:   req.ID,
-		UserID:   req.CurrentUserID,
 		Action:   req.Action,
 		Comment:  req.Comment,
 		FormData: req.FormData,

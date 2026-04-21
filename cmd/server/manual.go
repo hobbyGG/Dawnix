@@ -117,11 +117,14 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 	taskSvc := service.NewTaskService(taskRepo, scheduler, logger, cfg.Biz.Task.DefaultScope)
 	taskHandler := workflow.NewTaskHandler(taskSvc, logger)
 	authRepo := authData.NewRepo(dataObj)
-	authSvc := authService.NewService(authRepo, authService.Config{
+	authSvc, err := authService.NewService(authRepo, authService.Config{
 		JWTSecret:        cfg.Auth.JWT.Secret,
 		JWTIssuer:        cfg.Auth.JWT.Issuer,
 		JWTExpireMinutes: cfg.Auth.JWT.ExpireMinutes,
 	}, logger)
+	if err != nil {
+		return nil, fmt.Errorf("fail to initialize auth service: %w", err)
+	}
 	authHandler := authAPI.NewHandler(authSvc, logger)
 	authMiddleware := authService.JWTMiddleware(authSvc)
 

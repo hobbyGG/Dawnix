@@ -36,10 +36,11 @@ type LoginReq struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// 注册
 func (h *Handler) Signup(c *gin.Context) {
 	var req RegisterReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind signup request", err)
 		return
 	}
 
@@ -53,34 +54,33 @@ func (h *Handler) Signup(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
-		h.logger.Error("signup failed", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "signup failed", err)
 		return
 	}
 	c.JSON(http.StatusOK, result)
 }
 
+// 登录
 func (h *Handler) Signin(c *gin.Context) {
 	var req LoginReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind signin request", err)
 		return
 	}
 
 	result, err := h.svc.Login(c.Request.Context(), &authService.LoginParams{Username: req.Username, Password: req.Password})
 	if err != nil {
-		h.logger.Error("signin failed", zap.Error(err))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		if errors.Is(err, authService.ErrInvalidCredentials) {
+			writeUnauthorizedError(c, authService.ErrInvalidCredentials.Error())
+			return
+		}
+		writeInternalError(c, h.logger, "signin failed", err)
 		return
 	}
 	c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) Logout(c *gin.Context) {
-	if err := h.svc.Logout(c.Request.Context()); err != nil {
-		h.logger.Error("logout failed", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// JWT is stateless in current implementation, so logout is a client-side token discard.
 	c.JSON(http.StatusOK, gin.H{"status": "success"})
 }

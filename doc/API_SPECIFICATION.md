@@ -1,29 +1,68 @@
-# Dawnix 工作流引擎 - API 接口说明文档
+# Dawnix 工作流引擎 API 规范（按当前代码更新）
 
-## 文档概览
+**API Base URL**: `http://localhost:8080/api/v1`  
+**版本**: v1  
+**最后更新**: 2026-04-21
 
-本文档为 Dawnix 工作流引擎的前后端接口规范说明。Dawnix 是一个工作流/流程引擎系统，提供HTTP API支持流程定义、流程实例、任务管理等功能。
+## 文档说明
 
-> 说明：邮件服务节点已插件化，默认关闭。只有在配置中显式开启 `EMAIL_SERVICE_ENABLED=true` 并提供 `SMTP_TOKEN` 时，才允许创建和运行邮件节点。
+本文件按当前代码实现反向整理，重点补充了“接口 -> 代码位置”的映射，便于快速从 API 跳转到 handler/service/repo。
 
-**API 基础URL**: `http://localhost:8080/api/v1`
+## 认证与中间件
 
-**鉴权方式**: Bearer Token（JWT）
+1. 全局挂载 JWT 中间件：`internal/auth/service/middleware.go`
+2. `/api/v1/auth/*` 与 `OPTIONS` 请求跳过 JWT 校验
+3. Workflow 路由（enum/definition/instance/task）还会经过 `InjectUID`：`api/workflow/middleware/uid_middleware.go`
 
-> 认证能力遵循 KISS：当前提供注册、登录和登出接口。
-> Workflow 相关接口当前直接返回领域对象，响应字段名以 PascalCase 为主（如 `ID`、`CreatedAt`）。
+### CORS（当前实现）
+
+- CORS 中间件挂载位置：`cmd/server/manual.go`
+- 允许来源读取配置：`server.cors.allow_origins`（见 `configs/dev.yaml`）
+- 当前默认允许：`http://localhost:5173`
+- 预检请求（`OPTIONS`）由 CORS 中间件处理；若 `Origin` 不在允许列表，返回 `403`
+- `http://localhost:5173` 与 `http://127.0.0.1:5173` 属于不同源，需分别配置
+
+### 鉴权行为（当前实现）
+
+- 未带 Bearer Token：`401 {"error":"missing bearer token"}`
+- Token 无效：`401 {"error":"invalid token"}`
+- 上下文缺少 uid（理论上少见）：`401 {"error":"unauthorized"}`
 
 ---
 
-## 0. 认证接口 (Auth)
+## 路由总览（含代码定位）
 
-### 0.1 注册 (Signup)
+| 方法 | 路径 | 鉴权 | 入口代码 |
+|---|---|---|---|
+| POST | `/auth/signup` | 否 | `api/auth/handler.go` |
+| POST | `/auth/signin` | 否 | `api/auth/handler.go` |
+| POST | `/auth/logout` | 否 | `api/auth/handler.go` |
+| GET | `/enum/node-types` | 是 | `api/workflow/enum.go` |
+| GET | `/enum/form-types` | 是 | `api/workflow/enum.go` |
+| POST | `/definition/create` | 是 | `api/workflow/process_definition_handler.go` |
+| GET | `/definition/list` | 是 | `api/workflow/process_definition_handler.go` |
+| GET | `/definition/:id` | 是 | `api/workflow/process_definition_handler.go` |
+| PUT | `/definition/:id` | 是 | `api/workflow/process_definition_handler.go` |
+| DELETE | `/definition/:id` | 是 | `api/workflow/process_definition_handler.go` |
+| POST | `/instance/create` | 是 | `api/workflow/instance_handler.go` |
+| GET | `/instance/list` | 是 | `api/workflow/instance_handler.go` |
+| GET | `/instance/:id` | 是 | `api/workflow/instance_handler.go` |
+| DELETE | `/instance/:id` | 是 | `api/workflow/instance_handler.go` |
+| GET | `/task/:id` | 是 | `api/workflow/task_handler.go` |
+| GET | `/task/list` | 是 | `api/workflow/task_handler.go` |
+| POST | `/task/complete/:id` | 是 | `api/workflow/task_handler.go` |
 
-**接口**: `POST /api/v1/auth/signup`
+> 路由前缀由 `api/router.go` 统一加上 `/api/v1`。
 
-**功能**: 使用本地账号密码注册新用户。
+---
 
-**请求体**:
+## 0. Auth
+
+### 0.1 注册
+
+- **接口**: `POST /api/v1/auth/signup`
+- **请求体**:
+
 ```json
 {
   "username": "admin",
@@ -32,15 +71,8 @@
 }
 ```
 
-**字段说明**:
+- **响应体**:
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| username | string | 是 | 登录账号（唯一） |
-| password | string | 是 | 登录密码 |
-| display_name | string | 否 | 显示名称；不传时默认使用 username |
-
-**响应体**:
 ```json
 {
   "user_id": "1980531045852420096",
@@ -49,19 +81,16 @@
 }
 ```
 
-**状态码**:
-- `200`: 注册成功
-- `400`: 请求参数错误
-- `409`: 用户名已存在
-- `500`: 服务器错误
+- **状态码**: `200`/`400`/`409`/`500`
+- **代码位置**:
+  - Handler: `api/auth/handler.go#Signup`
+  - Service: `internal/auth/service/service.go#Register`
 
-### 0.2 登录 (Signin)
+### 0.2 登录
 
-**接口**: `POST /api/v1/auth/signin`
+- **接口**: `POST /api/v1/auth/signin`
+- **请求体**:
 
-**功能**: 使用本地账号密码登录，签发访问令牌。
-
-**请求体**:
 ```json
 {
   "username": "admin",
@@ -69,515 +98,162 @@
 }
 ```
 
-**响应体**:
+- **响应体**:
+
 ```json
 {
   "access_token": "<jwt_token>",
   "token_type": "Bearer",
-  "expires_at": "2026-04-20T12:00:00Z"
+  "expires_at": "2026-04-21T16:00:00+08:00"
 }
 ```
 
-**状态码**:
-- `200`: 登录成功
-- `400`: 请求参数错误
-- `401`: 用户名或密码错误
+- **状态码**: `200`/`400`/`401`/`500`
+- **代码位置**:
+  - Handler: `api/auth/handler.go#Signin`
+  - Service: `internal/auth/service/service.go#Login`
 
 ### 0.3 登出
 
-**接口**: `POST /api/v1/auth/logout`
+- **接口**: `POST /api/v1/auth/logout`
+- **行为**: 当前为无状态登出，仅返回成功，客户端自行清理 token。
+- **响应体**:
 
-**功能**: 登出接口（当前为无状态退出，服务端返回成功后由客户端清理 token）。
-
-**响应体**:
 ```json
 {
   "status": "success"
 }
 ```
 
-**状态码**:
-- `200`: 登出成功
-- `401`: 未登录或 token 无效
+- **状态码**: `200`
+- **代码位置**: `api/auth/handler.go#Logout`
 
 ---
 
-## 1. 枚举接口 (Enum)
+## 1. Enum
 
-用于给前端提供下拉选项，返回中文展示名和后端英文值。
-邮件服务节点是否返回，取决于后端是否开启邮件服务特性。
+### 1.1 获取节点类型
 
-### 0.1 获取节点类型枚举
+- **接口**: `GET /api/v1/enum/node-types`
+- **响应**: `{"list":[{"label":"开始节点","value":"start"}, ...]}`
+- **说明**: `email_service` 仅在 `biz.features.email_service.enabled=true` 时返回。
+- **代码位置**: `api/workflow/enum.go#NodeTypes`
 
-**接口**: `GET /api/v1/enum/node-types`
+### 1.2 获取表单类型
 
-**功能**: 获取当前支持的节点类型列表
-
-**响应体**:
-```json
-{
-  "list": [
-    {
-      "label": "开始节点",
-      "value": "start"
-    },
-    {
-      "label": "结束节点",
-      "value": "end"
-    },
-    {
-      "label": "用户任务",
-      "value": "user_task"
-    },
-    {
-      "label": "并行分支网关",
-      "value": "fork_gateway"
-    },
-    {
-      "label": "并行汇聚网关",
-      "value": "join_gateway"
-    },
-    {
-      "label": "排他网关",
-      "value": "xor_gateway"
-    },
-    {
-      "label": "包含网关",
-      "value": "inclusive_gateway"
-    },
-    {
-      "label": "邮件服务节点",
-      "value": "email_service"
-    }
-  ]
-}
-```
-
-**字段说明**:
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| list | array | 枚举列表 |
-| list[].label | string | 中文展示名，用于前端下拉显示 |
-| list[].value | string | 后端英文值，用于提交和保存 |
-
-> 说明：邮件服务节点仅在后端开启邮件服务特性时返回。
-
-**状态码**:
-- `200`: 查询成功
-- `500`: 服务器错误
+- **接口**: `GET /api/v1/enum/form-types`
+- **响应**: `{"list":[{"label":"单行文本","value":"text_single_line"}, ...]}`
+- **代码位置**: `api/workflow/enum.go#FormTypes`
 
 ---
 
-### 0.2 获取表单类型枚举
+## 2. Definition
 
-**接口**: `GET /api/v1/enum/form-types`
+### 2.1 创建流程定义
 
-**功能**: 获取当前支持的表单字段类型列表
+- **接口**: `POST /api/v1/definition/create`
+- **请求体关键字段**:
+  - `name` 必填
+  - `structure` 必填（`nodes`、`edges`）
+  - `code` 当前代码未做必填校验（建议传）
+  - `form_definition` 结构为 `[{id,label,type,value}]`
 
-**响应体**:
-```json
-{
-  "list": [
-    {
-      "label": "单行文本",
-      "value": "text_single_line"
-    },
-    {
-      "label": "数字",
-      "value": "number"
-    },
-    {
-      "label": "单选/下拉",
-      "value": "single_select"
-    },
-    {
-      "label": "日期",
-      "value": "date"
-    }
-  ]
-}
-```
+- **响应体**:
 
-**字段说明**:
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| list | array | 枚举列表 |
-| list[].label | string | 中文展示名，用于前端下拉显示 |
-| list[].value | string | 后端英文值，用于提交和保存 |
-
-**状态码**:
-- `200`: 查询成功
-- `500`: 服务器错误
-
----
-
-## 2. 流程定义管理接口 (Definition)
-
-流程定义是工作流的模板，包含流程的结构、节点、连线等信息。
-
-### 1.1 创建流程定义
-
-**接口**: `POST /api/v1/definition/create`
-
-**功能**: 创建一个新的流程定义模板
-
-**请求体**:
-```json
-{
-  "code": "leave_request",
-  "name": "请假审批流程",
-  "structure": {
-    "nodes": [
-      {
-        "id": "start",
-        "type": "start",
-        "name": "开始",
-        "candidates": {},
-        "properties": null
-      },
-      {
-        "id": "manager_review",
-        "type": "user_task",
-        "name": "经理审批",
-        "candidates": {
-          "users": ["user_id_1", "user_id_2"]
-        },
-        "properties": {
-          "assignee_rule": "FIRST_ONE"
-        }
-      },
-      {
-        "id": "end",
-        "type": "end",
-        "name": "结束",
-        "candidates": {},
-        "properties": null
-      }
-    ],
-    "edges": [
-      {
-        "id": "edge_1",
-        "source": "start",
-        "target": "manager_review",
-        "condition": "",
-        "is_default": false
-      },
-      {
-        "id": "edge_2",
-        "source": "manager_review",
-        "target": "end",
-        "condition": "",
-        "is_default": false
-      }
-    ],
-    "viewport": {
-      "x": 0,
-      "y": 0,
-      "zoom": 1
-    }
-  },
-  "form_definition": [
-    {
-      "id": "days",
-      "label": "days",
-      "type": "number",
-      "value": 0
-    },
-    {
-      "id": "reason",
-      "label": "reason",
-      "type": "string",
-      "value": ""
-    }
-  ]
-}
-```
-
-**字段说明**:
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| code | string | 是 | 流程代码，用于创建流程实例时的唯一标识 |
-| name | string | 是 | 流程名称 |
-| structure | object | 是 | 流程结构 (节点和连线) |
-| structure.nodes | array | 是 | 节点列表 |
-| structure.nodes[].id | string | 是 | 节点唯一ID |
-| structure.nodes[].type | string | 是 | 节点类型: start, end, user_task, fork_gateway, join_gateway, xor_gateway, inclusive_gateway；email_service 为可选插件节点，默认关闭 |
-| structure.nodes[].name | string | 是 | 节点显示名称 |
-| structure.nodes[].candidates | object | 否 | 候选人信息(仅user_task有效) |
-| structure.nodes[].properties | object | 否 | 节点特有属性 (JSON格式) |
-| structure.edges | array | 是 | 连线列表 |
-| structure.edges[].id | string | 是 | 连线ID |
-| structure.edges[].source | string | 是 | 源节点ID |
-| structure.edges[].target | string | 是 | 目标节点ID |
-| structure.edges[].condition | string | 否 | 条件表达式(网关使用) |
-| structure.edges[].is_default | boolean | 否 | 是否为默认连线 |
-| structure.viewport | object | 否 | 视口状态(用于恢复前端画布状态) |
-| form_definition | array | 否 | 表单定义项 |
-| form_definition[].id | string | 是 | 表单字段唯一ID |
-| form_definition[].label | string | 是 | 表单字段展示名，作为运行时变量名 |
-| form_definition[].type | string | 是 | 字段类型：text_single_line, number, single_select, date |
-| form_definition[].value | any | 否 | 字段默认值（可选） |
-
-**响应体**:
 ```json
 {
   "id": 1
 }
 ```
 
-**状态码**:
-- `200`: 创建成功，返回流程定义ID
-- `400`: 请求参数错误
-- `500`: 服务器错误
+- **状态码**: `200`/`400`/`500`
+- **代码位置**:
+  - Handler: `api/workflow/process_definition_handler.go#Create`
+  - Service: `internal/workflow/service/process_definition_service.go#CreateProcessDefinition`
+  - 校验: `internal/workflow/service/process_definition_service.go#validateAndBuildModel`
 
----
+### 2.2 流程定义列表
 
-### 1.2 获取流程定义列表
+- **接口**: `GET /api/v1/definition/list?page=1&size=10`
+- **参数约束**: `page>=1`，`1<=size<=50`
+- **响应体**:
 
-**接口**: `GET /api/v1/definition/list`
-
-**功能**: 分页获取流程定义列表
-
-**查询参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| page | int | 是 | 页码，从1开始 |
-| size | int | 是 | 每页数量，1-50 |
-
-**请求示例**:
-```
-GET /api/v1/definition/list?page=1&size=10
-```
-
-**响应体**:
 ```json
 {
   "total": 1,
   "list": [
     {
       "ID": 1,
-      "CreatedAt": "2024-01-15T10:30:00Z",
-      "UpdatedAt": "2024-01-15T10:30:00Z",
-      "DeletedAt": null,
-      "CreatedBy": "",
-      "UpdatedBy": "",
       "Code": "leave_request",
-      "Version": 1,
-      "Name": "请假审批流程",
-      "Structure": {
-        "nodes": [
-          {
-            "id": "start",
-            "type": "start",
-            "name": "开始"
-          }
-        ],
-        "edges": [
-          {
-            "id": "edge_1",
-            "source_node": "start",
-            "target_node": "end",
-            "condition": "",
-            "is_default": false
-          }
-        ]
-      },
-      "FormDefinition": [
-        {
-          "id": "days",
-          "label": "days",
-          "type": "number",
-          "value": 0
-        }
-      ],
-      "IsActive": true
+      "Name": "请假审批流程"
     }
   ]
 }
 ```
 
-> 说明：`total` 当前实现为本次返回列表长度（`len(list)`），不是全量总记录数。
+- **注意**:
+  1. `total` 当前是 `len(list)`，不是全量总数。
+  2. `page/size` 未设置默认值，建议显式传参。
+- **代码位置**:
+  - Handler: `api/workflow/process_definition_handler.go#List`
+  - Repo: `internal/workflow/data/process_definition_repo.go#List`
 
-**状态码**:
-- `200`: 查询成功
-- `400`: 参数错误
-- `500`: 服务器错误
+### 2.3 流程定义详情
 
----
+- **接口**: `GET /api/v1/definition/:id`
+- **响应**: 直接返回 `domain.ProcessDefinition`（字段为 PascalCase）
+- **代码位置**:
+  - Handler: `api/workflow/process_definition_handler.go#Detail`
+  - Service: `internal/workflow/service/process_definition_service.go#GetProcessDefinitionDetail`
 
-### 1.3 获取流程定义详情
+### 2.4 编辑流程定义
 
-**接口**: `GET /api/v1/definition/:id`
+- **接口**: `PUT /api/v1/definition/:id`
+- **响应体**:
 
-**功能**: 获取指定流程定义的详细信息
-
-**路径参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| id | int64 | 是 | 流程定义ID |
-
-**请求示例**:
-```
-GET /api/v1/definition/1
-```
-
-**响应体**:
-```json
-{
-  "ID": 1,
-  "CreatedAt": "2024-01-15T10:30:00Z",
-  "UpdatedAt": "2024-01-15T10:30:00Z",
-  "DeletedAt": null,
-  "CreatedBy": "",
-  "UpdatedBy": "",
-  "Code": "leave_request",
-  "Version": 1,
-  "Name": "请假审批流程",
-  "Structure": {
-    "nodes": [...],
-    "edges": [...],
-    "viewport": {...}
-  },
-  "FormDefinition": [
-    {
-      "id": "days",
-      "label": "days",
-      "type": "number",
-      "value": 0
-    },
-    {
-      "id": "reason",
-      "label": "reason",
-      "type": "string",
-      "value": ""
-    }
-  ],
-  "IsActive": true
-}
-```
-
-**状态码**:
-- `200`: 查询成功
-- `400`: ID参数错误
-- `500`: 服务器错误
-
----
-
-### 1.4 编辑流程定义
-
-**接口**: `PUT /api/v1/definition/:id`
-
-**功能**: 编辑指定流程定义
-
-**路径参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| id | int64 | 是 | 流程定义ID |
-
-**请求体**:
-```json
-{
-  "code": "leave_request",
-  "name": "请假审批流程(新版)",
-  "structure": {
-    "nodes": [...],
-    "edges": [...],
-    "viewport": {"x": 0, "y": 0, "zoom": 1}
-  },
-  "form_definition": [
-    {
-      "id": "days",
-      "label": "days",
-      "type": "number",
-      "value": 0
-    }
-  ]
-}
-```
-
-**请求示例**:
-```
-PUT /api/v1/definition/1
-```
-
-**响应体**:
 ```json
 {
   "status": "updated success"
 }
 ```
 
-**状态码**:
-- `200`: 编辑成功
-- `400`: 请求参数错误
-- `500`: 服务器错误
+- **代码位置**:
+  - Handler: `api/workflow/process_definition_handler.go#Update`
+  - Service: `internal/workflow/service/process_definition_service.go#UpdateProcessDefinition`
 
----
+### 2.5 删除流程定义
 
-### 1.5 删除流程定义
+- **接口**: `DELETE /api/v1/definition/:id`
+- **响应体**:
 
-**接口**: `DELETE /api/v1/definition/:id`
-
-**功能**: 删除指定的流程定义
-
-**路径参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| id | int64 | 是 | 流程定义ID |
-
-**请求示例**:
-```
-DELETE /api/v1/definition/1
-```
-
-**响应体**:
 ```json
 {
   "status": "deleted success"
 }
 ```
 
-**状态码**:
-- `200`: 删除成功
-- `400`: ID参数错误
-- `500`: 服务器错误
+- **代码位置**:
+  - Handler: `api/workflow/process_definition_handler.go#Delete`
+  - Repo: `internal/workflow/data/process_definition_repo.go#DeleteByID`
 
 ---
 
-## 3. 流程实例管理接口 (Instance)
+## 3. Instance
 
-流程实例是基于流程定义创建的具体执行实例，代表一个具体的工作流执行过程。
+### 3.1 创建流程实例
 
-### 2.1 创建流程实例
+- **接口**: `POST /api/v1/instance/create`
+- **请求体**:
 
-**接口**: `POST /api/v1/instance/create`
-
-**功能**: 创建并启动一个新的流程实例
-
-**请求体**:
 ```json
 {
   "process_code": "leave_request",
-  "submitter_id": "u_admin",
   "form_data": [
     {
       "id": "days",
       "label": "days",
       "type": "number",
       "value": 3
-    },
-    {
-      "id": "reason",
-      "label": "reason",
-      "type": "string",
-      "value": "年假"
     }
   ],
   "parent_id": 0,
@@ -585,141 +261,44 @@ DELETE /api/v1/definition/1
 }
 ```
 
-**字段说明**:
+- **响应体**:
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| process_code | string | 是 | 流程代码，对应ProcessDefinition的code字段 |
-| submitter_id | string | 否 | 发起人ID；已登录时以后端 token 注入为准 |
-| form_data | array | 否 | 业务表单数据 |
-| form_data[].id | string | 是 | 字段唯一ID |
-| form_data[].label | string | 是 | 字段展示名，作为运行时变量名 |
-| form_data[].type | string | 是 | 字段类型（需与 form_definition 对应字段一致） |
-| form_data[].value | any | 是 | 字段值 |
-| parent_id | int64 | 否 | 父流程实例ID (子流程场景) |
-| parent_node_id | string | 否 | 父流程节点ID (子流程场景) |
-
-> 说明：`form_data` 中不允许提交未在 `form_definition` 声明的字段，命中会返回错误。
-
-**响应体**:
 ```json
 {
   "id": 100
 }
 ```
 
-**状态码**:
-- `200`: 实例创建成功
-- `400`: 请求参数错误
-- `500`: 服务器错误
+- **状态码**: `200`/`400`/`500`
+- **代码位置**:
+  - Handler: `api/workflow/instance_handler.go#Create`
+  - Service: `internal/workflow/service/instance_service.go#CreateInstance`
+  - Scheduler: `internal/workflow/biz/scheduler.go#StartProcessInstance`
 
----
+### 3.2 实例列表
 
-### 2.2 获取流程实例列表
+- **接口**: `GET /api/v1/instance/list?page=1&size=20`
+- **参数约束**: `page>=1`，`1<=size<=100`
+- **响应**: 数组，元素为 `domain.ProcessInstance`
+- **注意**: `page/size` 未设置默认值，建议显式传参。
+- **代码位置**:
+  - Handler: `api/workflow/instance_handler.go#List`
+  - Repo: `internal/workflow/data/instance_repo.go#List`
 
-**接口**: `GET /api/v1/instance/list`
+### 3.3 实例详情
 
-**功能**: 分页获取流程实例列表
+- **接口**: `GET /api/v1/instance/:id`
+- **响应体**:
 
-**查询参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| page | int | 否 | 页码 |
-| size | int | 否 | 每页数量，最大100 |
-
-**请求示例**:
-```
-GET /api/v1/instance/list?page=1&size=20
-```
-
-**响应体**:
-```json
-[
-  {
-    "ID": 100,
-    "CreatedAt": "2024-01-15T10:30:00Z",
-    "UpdatedAt": "2024-01-15T10:30:00Z",
-    "DeletedAt": null,
-    "CreatedBy": "",
-    "UpdatedBy": "",
-    "DefinitionID": 1,
-    "ProcessCode": "leave_request",
-    "SnapshotStructure": {...},
-    "ParentID": 0,
-    "ParentNodeID": "",
-    "FormData": [...],
-    "Status": "PENDING",
-    "SubmitterID": "user_123",
-    "FinishedAt": null
-  }
-]
-```
-
-**实例状态**:
-- `PENDING`: 进行中
-- `APPROVED`: 已批准
-- `REJECTED`: 已驳回
-- `CANCELED`: 已取消
-- `SUSPENDED`: 已暂停
-
-**状态码**:
-- `200`: 查询成功
-- `400`: 参数错误
-- `500`: 服务器错误
-
----
-
-### 2.3 获取流程实例详情
-
-**接口**: `GET /api/v1/instance/:id`
-
-**功能**: 获取指定流程实例的详细信息
-
-**路径参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| id | int64 | 是 | 流程实例ID |
-
-**请求示例**:
-```
-GET /api/v1/instance/100
-```
-
-**响应体**:
 ```json
 {
   "inst": {
     "ID": 100,
-    "CreatedAt": "2024-01-15T10:30:00Z",
-    "UpdatedAt": "2024-01-15T10:30:00Z",
-    "DeletedAt": null,
-    "CreatedBy": "",
-    "UpdatedBy": "",
-    "DefinitionID": 1,
-    "ProcessCode": "leave_request",
-    "SnapshotStructure": {
-      "nodes": [...],
-      "edges": [...]
-    },
-    "ParentID": 0,
-    "ParentNodeID": "",
-    "FormData": [...],
-    "Status": "PENDING",
-    "SubmitterID": "user_123",
-    "FinishedAt": null
+    "ProcessCode": "leave_request"
   },
   "executions": [
     {
       "ID": 50,
-      "CreatedAt": "2024-01-15T10:30:00Z",
-      "UpdatedAt": "2024-01-15T10:30:00Z",
-      "DeletedAt": null,
-      "CreatedBy": "",
-      "UpdatedBy": "",
-      "InstID": 100,
-      "ParentID": 0,
       "NodeID": "manager_review",
       "IsActive": true
     }
@@ -727,118 +306,48 @@ GET /api/v1/instance/100
 }
 ```
 
-**状态码**:
-- `200`: 查询成功
-- `400`: ID参数错误
-- `500`: 服务器错误
+- **代码位置**:
+  - Handler: `api/workflow/instance_handler.go#Detail`
+  - Service: `internal/workflow/service/instance_service.go#GetInstanceDetail`
 
----
+### 3.4 删除实例
 
-### 2.4 删除流程实例
+- **接口**: `DELETE /api/v1/instance/:id`
+- **响应体**:
 
-**接口**: `DELETE /api/v1/instance/:id`
-
-**功能**: 删除指定的流程实例
-
-**路径参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| id | int64 | 是 | 流程实例ID |
-
-**请求示例**:
-```
-DELETE /api/v1/instance/100
-```
-
-**响应体**:
 ```json
 {
   "status": "deleted success"
 }
 ```
 
-**状态码**:
-- `200`: 删除成功
-- `400`: ID参数错误
-- `500`: 服务器错误
+- **代码位置**:
+  - Handler: `api/workflow/instance_handler.go#Delete`
+  - Repo: `internal/workflow/data/instance_repo.go#Delete`
 
 ---
 
-## 4. 任务管理接口 (Task)
+## 4. Task
 
-任务是在流程实例执行过程中产生的具体工作项，需要分配给用户进行处理。
+### 4.1 任务详情
 
-### 3.1 获取任务详情
+- **接口**: `GET /api/v1/task/:id`
+- **响应**: `domain.TaskView`（`ID/TaskName/Status/ProcessTitle/SubmitterName/ArrivedAt`）
+- **代码位置**:
+  - Handler: `api/workflow/task_handler.go#Detail`
+  - Service: `internal/workflow/service/task_service.go#GetTaskDetailView`
+  - Repo: `internal/workflow/data/task_repo.go#GetDetailView`
 
-**接口**: `GET /api/v1/task/:id`
+### 4.2 任务列表
 
-**功能**: 获取任务视图信息（当前实现返回 TaskView）
+- **接口**: `GET /api/v1/task/list?page=1&size=10&scope=my_pending`
+- **参数**:
+  - `page` 默认 1（handler 内补默认）
+  - `size` 默认 10（handler 内补默认，最大 100）
+  - `scope` 支持：`my_todo`/`my_pending`/`my_completed`/`all_pending`/`all_completed`
 
-**路径参数**:
+- **响应体**:
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| id | int64 | 是 | 任务ID |
-
-**请求示例**:
-```
-GET /api/v1/task/200
-```
-
-**响应体**:
-```json
-{
-  "ID": 200,
-  "TaskName": "经理审批",
-  "Status": "PENDING",
-  "ProcessTitle": "请假审批流程",
-  "SubmitterName": "user_123",
-  "ArrivedAt": "2024-01-15T10:30:00Z"
-}
-```
-
-**任务状态**:
-- `PENDING`: 待处理
-- `APPROVED`: 已批准
-- `REJECTED`: 已驳回
-- `TRANSFERRED`: 已转派
-- `ROLLED_BACK`: 已撤回
-- `CANCELED`: 已取消
-- `ABORTED`: 已中止
-
-**任务类型**:
-- `user_task`: 用户任务（需要人工审批）
-- `service_task`: 服务任务（自动执行；当前文档中的邮件服务能力属于可选插件，不默认启用）
-- `receive_task`: 接收任务
-- `cc_task`: 抄送任务
-
-**状态码**:
-- `200`: 查询成功（业务错误时返回 `{"error":"..."}`）
-- `400`: ID参数错误
-
----
-
-### 3.2 获取任务列表
-
-**接口**: `GET /api/v1/task/list`
-
-**功能**: 分页获取当前用户的任务列表
-
-**查询参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| page | int | 否 | 页码，默认1 |
-| size | int | 否 | 每页数量，默认10，最多100 |
-| scope | string | 否 | 列表范围: my_pending(我的待办), my_completed(我的已办), all_pending(所有待办), all_completed(所有已办) |
-
-**请求示例**:
-```
-GET /api/v1/task/list?page=1&size=10&scope=my_pending
-```
-
-**响应体**:
 ```json
 {
   "total": 5,
@@ -849,295 +358,99 @@ GET /api/v1/task/list?page=1&size=10&scope=my_pending
       "Status": "PENDING",
       "ProcessTitle": "请假审批流程",
       "SubmitterName": "user_123",
-      "ArrivedAt": "2024-01-15T10:30:00Z"
-    },
-    {
-      "ID": 201,
-      "TaskName": "部长审批",
-      "Status": "PENDING",
-      "ProcessTitle": "请假审批流程",
-      "SubmitterName": "user_456",
-      "ArrivedAt": "2024-01-15T11:00:00Z"
+      "ArrivedAt": "2026-04-21T13:00:00+08:00"
     }
   ]
 }
 ```
 
-> 说明：`scope` 除 `my_pending/my_completed/all_pending/all_completed` 外，还支持 `my_todo`（默认值）。
+- **当前实现说明**:
+  1. `my_todo/my_pending/all_pending` -> 状态过滤为 `PENDING`
+  2. `my_completed/all_completed` -> 状态过滤为 `APPROVED`
+  3. repo 层始终按当前用户做身份过滤，因此 `all_*` 当前并非“全员可见”
+- **代码位置**:
+  - Handler: `api/workflow/task_handler.go#List`
+  - Service: `internal/workflow/service/task_service.go#ListTasksView`
+  - Repo: `internal/workflow/data/task_repo.go#ListWithFilter`
 
-**状态码**:
-- `200`: 查询成功（业务错误时返回 `{"error":"..."}`）
-- `400`: 参数错误
-- `401`: 未认证或 token 无效
+### 4.3 完成任务
 
----
+- **接口**: `POST /api/v1/task/complete/:id`
+- **请求体**:
 
-### 3.3 完成任务
-
-**接口**: `POST /api/v1/task/complete/:id`
-
-**功能**: 完成指定的任务(审批/驳回等)
-
-**路径参数**:
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| id | int64 | 是 | 任务ID |
-
-**请求体**:
 ```json
 {
   "action": "agree",
   "comment": "已审批同意",
   "form_data": [
     {
-      "id": "days",
-      "label": "days",
-      "type": "number",
-      "value": 3
-    },
-    {
       "id": "approval_opinion",
       "label": "approval_opinion",
-      "type": "string",
-      "value": "同意请假"
+      "type": "text_single_line",
+      "value": "同意"
     }
   ]
 }
 ```
 
-**字段说明**:
+- **约束**:
+  - `action` 必填，且仅支持 `agree/reject`
+  - 仅 `PENDING` 任务可完成
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| action | string | 是 | 操作类型: agree(同意), reject(驳回) |
-| comment | string | 否 | 审批意见/备注 |
-| form_data | array | 否 | 提交的表单数据 |
-| form_data[].id | string | 是 | 字段唯一ID |
-| form_data[].label | string | 是 | 字段展示名，作为运行时变量名 |
-| form_data[].type | string | 是 | 字段类型（需与 form_definition 对应字段一致） |
-| form_data[].value | any | 是 | 字段值 |
+- **响应体**:
 
-> 说明：`form_data` 中不允许提交未在 `form_definition` 声明的字段，命中会返回错误。
-
-**响应体**:
 ```json
 {
   "status": "success"
 }
 ```
 
-**状态码**:
-- `200`: 任务完成成功（业务错误时返回 `{"error":"..."}`）
-- `400`: 请求参数错误
-- `401`: 未认证或 token 无效
+- **代码位置**:
+  - Handler: `api/workflow/task_handler.go#Complete`
+  - Service: `internal/workflow/service/task_service.go#CompleteTask`
+  - Scheduler: `internal/workflow/biz/scheduler.go#CompleteTask`
 
 ---
 
-## 数据结构说明
+## 数据结构（当前实现）
 
-### FormDataItem (表单数据项)
+### FormDataItem
 
-表单数据采用列表形式，每个项包含id、label、type和value四个字段。
-
-- `id`：字段的唯一标识，用于合并和定位同一项
-- `label`：字段展示名，同时作为运行时表达式变量名
+代码定义：`internal/workflow/biz/types.go`
 
 ```json
 {
-  "id": "field_001",
-  "label": "field_name",
-  "type": "string",
-  "value": "field_value"
+  "id": "days",
+  "label": "days",
+  "type": "number",
+  "value": 3
 }
 ```
 
-支持的字段类型（当前版本）:
-- `text_single_line`: 单行文本
-- `number`: 数字
-- `single_select`: 单选/下拉
-- `date`: 日期（RFC3339 字符串）
+- `id`: 必填
+- `label`: 必填（表达式变量名）
+- `type`: 必填（标准值：`text_single_line`/`number`/`single_select`/`date`）
+- `value`: 运行时必填；定义时可为空
 
-当前版本暂不支持：联系人（成员选择器）、附件、图片等复杂类型。
+> 类型别名（如 `string`、`text`、`select`）在当前实现中会被归一化处理，见 `normalizeFormType`。
 
-### Candidates (候选人)
+### ProcessStructure
 
-用户任务的候选人配置
+请求体（Definition Create/Update）里的 `structure.edges` 字段使用 `source/target`。  
+落库后领域模型中的边字段为 `source_node/target_node`（`internal/workflow/domain/workflow.go`）。
+
+---
+
+## 统一错误格式
+
+大多数错误返回：
 
 ```json
 {
-  "users": ["user_id_1", "user_id_2"]
+  "error": "具体错误信息"
 }
 ```
 
-### ProcessStructure (流程结构)
-
-包含节点和连线的完整流程定义
-
-```json
-{
-  "nodes": [...],
-  "edges": [...],
-  "viewport": {
-    "x": 0,
-    "y": 0,
-    "zoom": 1
-  }
-}
-```
-
-### 节点能力说明
-
-- `start` / `end`: 流程开始与结束节点
-- `user_task`: 用户任务节点，需要人工审批
-- `fork_gateway` / `join_gateway` / `xor_gateway` / `inclusive_gateway`: 网关节点
-- `email_service`: 邮件服务节点，默认关闭；启用后会投递邮件任务到 Redis，由 worker 消费发送
-
-如果需要使用邮件服务节点，请在运行配置中开启 `EMAIL_SERVICE_ENABLED=true`，并同步配置 `SMTP_TOKEN`、`SMTP_EMAIL`、`REDIS_ADDR`。
-
----
-
-## 错误处理
-
-所有接口的错误响应格式统一为:
-
-```json
-{
-  "error": "错误信息说明"
-}
-```
-
-常见HTTP状态码:
-- `200`: 请求成功
-- `400`: 请求参数错误或验证失败
-- `401`: 未认证或令牌无效
-- `404`: 资源不存在
-- `500`: 服务器内部错误
-
----
-
-## 身份字段迁移说明
-
-为保持 Auth 与 Workflow 一致性，系统内用户身份字段统一为 `string`。
-
-### 统一约束
-
-- `submitter_id` 使用 string
-- 任务 `assignee` 使用 string
-- 任务 `candidates` 数组成员使用 string
-- JWT `sub` 与内部 `uid` 使用 string
-- `user_id` 作为 Auth 主身份键，使用 string
-
-### 兼容策略
-
-- 历史整型身份值在迁移时转为字符串存储
-- 业务层不再接收 `int64` 用户身份字段
-- 新接口与中间件仅向下游传递 string 类型身份
-
-### 迁移建议顺序
-
-1. 先做数据库列类型与数据转换
-2. 再切换应用层 DTO 和领域模型
-3. 最后清理遗留整型身份字段
-
----
-
-## 前端集成建议
-
-### 1. 基础请求配置
-
-```javascript
-const API_BASE = 'http://localhost:8080/api/v1';
-
-const request = async (method, path, data = null) => {
-  const url = `${API_BASE}${path}`;
-  const token = localStorage.getItem('access_token');
-  const options = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  };
-  
-  if (data) {
-    options.body = JSON.stringify(data);
-  }
-  
-  const res = await fetch(url, options);
-  return res.json();
-};
-```
-
-### 2. 常用API调用示例
-
-```javascript
-// 获取流程定义列表
-const definitions = await request('GET', '/definition/list?page=1&size=10');
-
-// 登录（成功后保存 access_token）
-const loginResp = await request('POST', '/auth/signin', {
-  username: 'admin',
-  password: 'password'
-});
-localStorage.setItem('access_token', loginResp.access_token);
-
-// 创建流程实例
-const instance = await request('POST', '/instance/create', {
-  process_code: 'leave_request',
-  form_data: [...]
-});
-
-// 获取待办任务列表
-const tasks = await request('GET', '/task/list?scope=my_pending&page=1&size=10');
-
-// 完成任务
-await request('POST', `/task/complete/${taskId}`, {
-  action: 'agree',
-  comment: '已批准',
-  form_data: [...]
-});
-```
-
-### 3. 流程交互流程
-
-1. **发起流程**: 调用 `POST /instance/create` 创建实例
-2. **查看待办**: 调用 `GET /task/list` 获取当前用户待办任务
-3. **查看任务详情**: 调用 `GET /task/:id` 查看具体任务
-4. **处理任务**: 调用 `POST /task/complete/:id` 完成任务
-5. **查看流程详情**: 调用 `GET /instance/:id` 查看流程进展
-
----
-
-## 联调清单 (KISS)
-
-### 1. 登录获取 Token
-
-1. 调用 `POST /api/v1/auth/signin`
-2. 保存 `access_token`
-3. 后续请求统一携带 `Authorization: Bearer <token>`
-
-### 2. 访问受保护接口
-
-1. 使用 token 调用 `GET /api/v1/task/list`
-2. 使用 token 调用 `POST /api/v1/instance/create`
-3. 校验后端以 token 中用户身份写入 `submitter_id`
-
-### 3. 未登录校验
-
-1. 不带 token 调用 `GET /api/v1/task/list`
-2. 预期返回 `401`
-
-### 4. 登出
-
-1. 调用 `POST /api/v1/auth/logout`
-2. 客户端清理本地 token
-3. 清理后再次访问受保护接口应返回 `401`
-
----
-
-## 版本信息
-
-- API 版本: v1
-- 最后更新: 2026-04-20
-- 维护者: Dawnix Team
+错误写入位置：
+- Auth: `api/auth/http_helper.go`
+- Workflow: `api/workflow/http_helper.go`

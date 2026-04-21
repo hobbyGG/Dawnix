@@ -1,0 +1,22 @@
+package auth
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+)
+
+func writeBindError(c *gin.Context, logger *zap.Logger, message string, err error) {
+	logger.Error(message, zap.Error(err))
+	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+}
+
+func writeInternalError(c *gin.Context, logger *zap.Logger, message string, err error) {
+	logger.Error(message, zap.Error(err))
+	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+}
+
+func writeUnauthorizedError(c *gin.Context, message string) {
+	c.JSON(http.StatusUnauthorized, gin.H{"error": message})
+}

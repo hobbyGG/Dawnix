@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	authService "github.com/hobbyGG/Dawnix/internal/auth/service"
+	"github.com/hobbyGG/Dawnix/api/workflow/middleware"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/service"
 	"go.uber.org/zap"
@@ -21,7 +21,7 @@ func NewInstanceHandler(svc *service.InstanceService, logger *zap.Logger) *Insta
 
 func (h *InstanceHandler) Register(rg *gin.RouterGroup) {
 	// 在这里注册Instance相关的路由
-	r := rg.Group("instance")
+	r := rg.Group("instance", middleware.InjectUID())
 	r.POST("create", h.Create)
 	r.GET("list", h.List)
 	r.GET(":id", h.Detail)
@@ -32,23 +32,13 @@ func (h *InstanceHandler) Create(c *gin.Context) {
 	// 处理创建实例的请求
 	req := new(CreateInstanceReq)
 	if err := c.ShouldBindJSON(req); err != nil {
-		h.logger.Error("failed to bind CreateInstanceReq", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind CreateInstanceReq", err)
 		return
 	}
-	// 调用服务层创建实例
-	createInstanceParams := req.ToBizParams()
-	if userID, ok := authService.UserIDFromContext(c.Request.Context()); ok {
-		createInstanceParams.SubmitterID = userID
-	}
-	if createInstanceParams.SubmitterID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "submitter_id is required"})
-		return
-	}
-	id, err := h.svc.CreateInstance(c, createInstanceParams)
+
+	id, err := h.svc.CreateInstance(c, req.ToBizParams())
 	if err != nil {
-		h.logger.Error("failed to create instance", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "failed to create instance", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"id": id})
@@ -58,14 +48,12 @@ func (h *InstanceHandler) List(c *gin.Context) {
 	// 处理获取实例列表的请求
 	req := new(ListInstancesReq)
 	if err := c.ShouldBindQuery(req); err != nil {
-		h.logger.Error("failed to bind ListInstancesReq", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind ListInstancesReq", err)
 		return
 	}
 	instances, err := h.svc.ListInstances(c, req.ToBizParams())
 	if err != nil {
-		h.logger.Error("failed to list instances", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "failed to list instances", err)
 		return
 	}
 	c.JSON(http.StatusOK, instances)
@@ -75,14 +63,12 @@ func (h *InstanceHandler) Detail(c *gin.Context) {
 	// 处理获取实例详情的请求
 	req := new(GetInstanceDetailReq)
 	if err := c.ShouldBindUri(req); err != nil {
-		h.logger.Error("failed to bind GetInstanceDetailReq", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind GetInstanceDetailReq", err)
 		return
 	}
 	instance, err := h.svc.GetInstanceDetail(c, req.ID)
 	if err != nil {
-		h.logger.Error("failed to get instance detail", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "failed to get instance detail", err)
 		return
 	}
 	c.JSON(http.StatusOK, instance)
@@ -92,13 +78,11 @@ func (h *InstanceHandler) Delete(c *gin.Context) {
 	// 处理删除实例的请求
 	req := new(DeleteInstanceReq)
 	if err := c.ShouldBindUri(req); err != nil {
-		h.logger.Error("failed to bind DeleteInstanceReq", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeBindError(c, h.logger, "failed to bind DeleteInstanceReq", err)
 		return
 	}
 	if err := h.svc.DeleteInstance(c, req.ID); err != nil {
-		h.logger.Error("failed to delete instance", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeInternalError(c, h.logger, "failed to delete instance", err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "deleted success"})
@@ -108,9 +92,6 @@ type CreateInstanceReq struct {
 	// 流程标识 (必填)
 	// 前端只传 Code，后端负责查 Definition 表找最新版
 	ProcessCode string `json:"process_code" binding:"required"`
-
-	// 发起人 ID (必填)
-	SubmitterID string `json:"submitter_id"`
 
 	// 业务表单数据 (可选)
 	FormData []biz.FormDataItem `json:"form_data"`
@@ -123,7 +104,6 @@ type CreateInstanceReq struct {
 func (r *CreateInstanceReq) ToBizParams() *biz.StartProcessInstanceParams {
 	return &biz.StartProcessInstanceParams{
 		ProcessCode:  r.ProcessCode,
-		SubmitterID:  r.SubmitterID,
 		FormData:     r.FormData,
 		ParentID:     r.ParentID,
 		ParentNodeID: r.ParentNodeID,

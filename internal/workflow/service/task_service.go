@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	authService "github.com/hobbyGG/Dawnix/internal/auth/service"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 	"go.uber.org/zap"
@@ -33,6 +34,16 @@ func (s *TaskService) GetTaskDetailView(ctx context.Context, taskID int64) (*dom
 }
 
 func (s *TaskService) ListTasksView(ctx context.Context, params *biz.ListTasksParams) ([]*domain.TaskView, int64, error) {
+	if params == nil {
+		return nil, 0, fmt.Errorf("list tasks params is nil")
+	}
+	if params.UserID == "" {
+		uid, ok := authService.UserIDFromContext(ctx)
+		if !ok {
+			return nil, 0, fmt.Errorf("user id is required")
+		}
+		params.UserID = uid
+	}
 	if params.Scope == "" {
 		params.Scope = s.defaultScope
 	}
@@ -57,7 +68,11 @@ func (s *TaskService) CompleteTask(ctx context.Context, params *biz.CompleteTask
 		return fmt.Errorf("complete task params is nil")
 	}
 	if params.UserID == "" {
-		return fmt.Errorf("user id is required")
+		uid, ok := authService.UserIDFromContext(ctx)
+		if !ok {
+			return fmt.Errorf("user id is required")
+		}
+		params.UserID = uid
 	}
 	// 根据id拿到任务实例
 	task, err := s.repo.GetByID(ctx, params.TaskID)

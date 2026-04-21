@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hobbyGG/Dawnix/api/workflow/middleware"
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 )
 
@@ -16,7 +17,7 @@ func NewEnumHandler(emailServiceEnabled bool) *EnumHandler {
 }
 
 func (h *EnumHandler) Register(rg *gin.RouterGroup) {
-	r := rg.Group("enum")
+	r := rg.Group("enum", middleware.InjectUID())
 	r.GET("node-types", h.NodeTypes)
 	r.GET("form-types", h.FormTypes)
 }

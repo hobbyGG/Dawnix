@@ -108,6 +108,9 @@ func (s *ProcessDefinitionService) validateAndBuildModel(params *biz.ProcessDefi
 	if err := validateGraphStructure(params.Structure); err != nil {
 		return nil, fmt.Errorf("invalid structure graph: %w", err)
 	}
+	if err := validateUserTaskApprovers(params.Structure); err != nil {
+		return nil, fmt.Errorf("invalid structure approvers: %w", err)
+	}
 	if err := validateXORRoutingRules(params.Structure); err != nil {
 		return nil, fmt.Errorf("invalid structure routing rules: %w", err)
 	}
@@ -232,6 +235,28 @@ func validateGraphStructure(graph *domain.GraphModel) error {
 		}
 		if node.Type == domain.NodeTypeEnd && outDegree[node.ID] > 0 {
 			return fmt.Errorf("end node %s cannot have outgoing edges", node.ID)
+		}
+	}
+
+	return nil
+}
+
+func validateUserTaskApprovers(graph *domain.GraphModel) error {
+	if graph == nil {
+		return fmt.Errorf("graph is nil")
+	}
+
+	for _, node := range graph.Nodes {
+		if node.Type != domain.NodeTypeUserTask {
+			continue
+		}
+		if len(node.Candidates.Users) == 0 {
+			return fmt.Errorf("user task node %s must specify at least one approver", node.ID)
+		}
+		for idx, userID := range node.Candidates.Users {
+			if userID == "" {
+				return fmt.Errorf("user task node %s approver[%d] is empty", node.ID, idx)
+			}
 		}
 	}
 

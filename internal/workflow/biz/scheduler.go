@@ -206,16 +206,18 @@ func (s *Scheduler) CompleteTask(ctx context.Context, task *domain.ProcessTask) 
 }
 
 func (s *Scheduler) resolveCompleteTaskHandler(nodeType string) completeTaskHandler {
-	handlers := map[string]completeTaskHandler{
-		domain.NodeTypeForkGateway:      s.handleForkGatewayTaskCompletion,
-		domain.NodeTypeJoinGateway:      s.handleJoinGatewayTaskCompletion,
-		domain.NodeTypeXORGateway:       s.handleXORGatewayTaskCompletion,
-		domain.NodeTypeInclusiveGateway: s.handleInclusiveGatewayTaskCompletion,
+	switch nodeType {
+	case domain.NodeTypeForkGateway:
+		return s.handleForkGatewayTaskCompletion
+	case domain.NodeTypeJoinGateway:
+		return s.handleJoinGatewayTaskCompletion
+	case domain.NodeTypeXORGateway:
+		return s.handleXORGatewayTaskCompletion
+	case domain.NodeTypeInclusiveGateway:
+		return s.handleInclusiveGatewayTaskCompletion
+	default:
+		return s.handleDefaultTaskCompletion
 	}
-	if handler, ok := handlers[nodeType]; ok {
-		return handler
-	}
-	return s.handleDefaultTaskCompletion
 }
 
 func (s *Scheduler) handleXORGatewayTaskCompletion(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) error {
@@ -241,30 +243,11 @@ func (s *Scheduler) handleXORGatewayTaskCompletion(ctx context.Context, exec *do
 }
 
 func (s *Scheduler) handleForkGatewayTaskCompletion(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) error {
-	exec.IsActive = false
-	if err := s.executionRepo.Update(ctx, exec); err != nil {
-		return fmt.Errorf("failed to update execution: %w", err)
-	}
-
 	edges := rg.Next[exec.NodeID]
-	execs := make([]domain.Execution, 0, len(edges))
-	for _, edge := range edges {
-		execs = append(execs, domain.Execution{
-			InstID:   exec.InstID,
-			ParentID: exec.ID,
-			NodeID:   edge.TargetNode,
-			IsActive: true,
-		})
+	if len(edges) == 0 {
+		return fmt.Errorf("node %s has no outgoing edge", exec.NodeID)
 	}
-	if err := s.executionRepo.CreateBatch(ctx, execs); err != nil {
-		return fmt.Errorf("failed to create branch executions: %w", err)
-	}
-	for i := range execs {
-		if _, _, err := s.moveToken(ctx, execs[i].ID, execs[i].NodeID, rg); err != nil {
-			return err
-		}
-	}
-	return nil
+	return s.fanOutExecutions(ctx, exec, edges, rg)
 }
 
 func (s *Scheduler) handleJoinGatewayTaskCompletion(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) error {
@@ -308,13 +291,9 @@ func (s *Scheduler) handleInclusiveGatewayTaskCompletion(ctx context.Context, ex
 		return fmt.Errorf("failed to get instance by id: %w", err)
 	}
 
-	items, err := DecodeFormDataItems(inst.FormData)
+	formData, err := formDataMapFromPayload(inst.FormData, exec.NodeID, "inclusive")
 	if err != nil {
-		return fmt.Errorf("inclusive node %s decode instance form_data failed: %w", exec.NodeID, err)
-	}
-	formData, err := FormDataItemsToMap(items)
-	if err != nil {
-		return fmt.Errorf("inclusive node %s convert form_data failed: %w", exec.NodeID, err)
+		return err
 	}
 
 	var defaultEdge *domain.EdgeModel
@@ -340,19 +319,9 @@ func (s *Scheduler) handleInclusiveGatewayTaskCompletion(ctx context.Context, ex
 			continue
 		}
 
-		expression, err := govaluate.NewEvaluableExpression(condition)
+		hit, err := evaluateEdgeCondition(exec.NodeID, edge, condition, formData, "inclusive")
 		if err != nil {
-			return fmt.Errorf("inclusive node %s edge %s parse condition failed: %w", exec.NodeID, edge.ID, err)
-		}
-
-		result, err := expression.Evaluate(formData)
-		if err != nil {
-			return fmt.Errorf("inclusive node %s edge %s evaluate condition failed: %w", exec.NodeID, edge.ID, err)
-		}
-
-		hit, ok := result.(bool)
-		if !ok {
-			return fmt.Errorf("inclusive node %s edge %s condition result must be bool", exec.NodeID, edge.ID)
+			return err
 		}
 		if hit {
 			matched = append(matched, edge)
@@ -366,31 +335,7 @@ func (s *Scheduler) handleInclusiveGatewayTaskCompletion(ctx context.Context, ex
 		}
 		matched = append(matched, defaultEdge)
 	}
-
-	// all matched edges create new executions (like fork gateway with conditions)
-	exec.IsActive = false
-	if err := s.executionRepo.Update(ctx, exec); err != nil {
-		return fmt.Errorf("failed to update execution: %w", err)
-	}
-
-	execs := make([]domain.Execution, 0, len(matched))
-	for _, edge := range matched {
-		execs = append(execs, domain.Execution{
-			InstID:   exec.InstID,
-			ParentID: exec.ID,
-			NodeID:   edge.TargetNode,
-			IsActive: true,
-		})
-	}
-	if err := s.executionRepo.CreateBatch(ctx, execs); err != nil {
-		return fmt.Errorf("failed to create branch executions: %w", err)
-	}
-	for i := range execs {
-		if _, _, err := s.moveToken(ctx, execs[i].ID, execs[i].NodeID, rg); err != nil {
-			return err
-		}
-	}
-	return nil
+	return s.fanOutExecutions(ctx, exec, matched, rg)
 }
 
 func (s *Scheduler) handleDefaultTaskCompletion(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) error {
@@ -405,13 +350,9 @@ func (s *Scheduler) handleDefaultTaskCompletion(ctx context.Context, exec *domai
 }
 
 func selectXORTargetEdge(edges []*domain.EdgeModel, formPayload []byte, nodeID string) (*domain.EdgeModel, error) {
-	items, err := DecodeFormDataItems(formPayload)
+	formData, err := formDataMapFromPayload(formPayload, nodeID, "xor")
 	if err != nil {
-		return nil, fmt.Errorf("xor node %s decode instance form_data failed: %w", nodeID, err)
-	}
-	formData, err := FormDataItemsToMap(items)
-	if err != nil {
-		return nil, fmt.Errorf("xor node %s convert form_data failed: %w", nodeID, err)
+		return nil, err
 	}
 
 	var defaultEdge *domain.EdgeModel
@@ -437,19 +378,9 @@ func selectXORTargetEdge(edges []*domain.EdgeModel, formPayload []byte, nodeID s
 			return nil, fmt.Errorf("xor node %s edge %s: condition is required", nodeID, edge.ID)
 		}
 
-		expression, err := govaluate.NewEvaluableExpression(condition)
+		hit, err := evaluateEdgeCondition(nodeID, edge, condition, formData, "xor")
 		if err != nil {
-			return nil, fmt.Errorf("xor node %s edge %s parse condition failed: %w", nodeID, edge.ID, err)
-		}
-
-		result, err := expression.Evaluate(formData)
-		if err != nil {
-			return nil, fmt.Errorf("xor node %s edge %s evaluate condition failed: %w", nodeID, edge.ID, err)
-		}
-
-		hit, ok := result.(bool)
-		if !ok {
-			return nil, fmt.Errorf("xor node %s edge %s condition result must be bool", nodeID, edge.ID)
+			return nil, err
 		}
 		if hit {
 			matched = append(matched, edge)
@@ -467,6 +398,63 @@ func selectXORTargetEdge(edges []*domain.EdgeModel, formPayload []byte, nodeID s
 	}
 
 	return nil, fmt.Errorf("xor node %s has no matched edge and no default edge", nodeID)
+}
+
+func (s *Scheduler) fanOutExecutions(ctx context.Context, exec *domain.Execution, edges []*domain.EdgeModel, rg *RuntimeGraph) error {
+	exec.IsActive = false
+	if err := s.executionRepo.Update(ctx, exec); err != nil {
+		return fmt.Errorf("failed to update execution: %w", err)
+	}
+
+	nextExecutions := make([]domain.Execution, 0, len(edges))
+	for _, edge := range edges {
+		nextExecutions = append(nextExecutions, domain.Execution{
+			InstID:   exec.InstID,
+			ParentID: exec.ID,
+			NodeID:   edge.TargetNode,
+			IsActive: true,
+		})
+	}
+
+	if err := s.executionRepo.CreateBatch(ctx, nextExecutions); err != nil {
+		return fmt.Errorf("failed to create branch executions: %w", err)
+	}
+	for i := range nextExecutions {
+		if _, _, err := s.moveToken(ctx, nextExecutions[i].ID, nextExecutions[i].NodeID, rg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func formDataMapFromPayload(formPayload []byte, nodeID, gateway string) (map[string]interface{}, error) {
+	items, err := DecodeFormDataItems(formPayload)
+	if err != nil {
+		return nil, fmt.Errorf("%s node %s decode instance form_data failed: %w", gateway, nodeID, err)
+	}
+	formData, err := FormDataItemsToMap(items)
+	if err != nil {
+		return nil, fmt.Errorf("%s node %s convert form_data failed: %w", gateway, nodeID, err)
+	}
+	return formData, nil
+}
+
+func evaluateEdgeCondition(nodeID string, edge *domain.EdgeModel, condition string, formData map[string]interface{}, gateway string) (bool, error) {
+	expression, err := govaluate.NewEvaluableExpression(condition)
+	if err != nil {
+		return false, fmt.Errorf("%s node %s edge %s parse condition failed: %w", gateway, nodeID, edge.ID, err)
+	}
+
+	result, err := expression.Evaluate(formData)
+	if err != nil {
+		return false, fmt.Errorf("%s node %s edge %s evaluate condition failed: %w", gateway, nodeID, edge.ID, err)
+	}
+
+	hit, ok := result.(bool)
+	if !ok {
+		return false, fmt.Errorf("%s node %s edge %s condition result must be bool", gateway, nodeID, edge.ID)
+	}
+	return hit, nil
 }
 
 // moveToken 根据执行流id跳转到指定节点，并调用节点处理器
