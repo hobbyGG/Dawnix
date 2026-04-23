@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -64,7 +65,20 @@ func (h *InstanceHandler) List(c *gin.Context) {
 		writeInternalError(c, h.logger, "failed to list instances", err)
 		return
 	}
-	c.JSON(http.StatusOK, instances)
+
+	listItems := make([]InstanceListItem, 0, len(instances))
+	for _, inst := range instances {
+		listItems = append(listItems, InstanceListItem{
+			ID:          inst.ID,
+			ProcessCode: inst.ProcessCode,
+			ProcessName: "",
+			Status:      inst.Status,
+			SubmitterID: inst.SubmitterID,
+			CreatedAt:   inst.CreatedAt,
+			FinishedAt:  inst.FinishedAt,
+		})
+	}
+	c.JSON(http.StatusOK, InstanceListReply{Total: int64(len(instances)), List: listItems})
 }
 
 func (h *InstanceHandler) Detail(c *gin.Context) {
@@ -79,7 +93,43 @@ func (h *InstanceHandler) Detail(c *gin.Context) {
 		writeInternalError(c, h.logger, "failed to get instance detail", err)
 		return
 	}
-	c.JSON(http.StatusOK, instance)
+	var reply *InstanceDetailReply
+	if instance != nil && instance.Inst != nil {
+		detailItem := InstanceDetailItem{
+			ID:                instance.Inst.ID,
+			DefinitionID:      instance.Inst.DefinitionID,
+			ProcessCode:       instance.Inst.ProcessCode,
+			SnapshotStructure: json.RawMessage(instance.Inst.SnapshotStructure),
+			ParentID:          instance.Inst.ParentID,
+			ParentNodeID:      instance.Inst.ParentNodeID,
+			FormData:          json.RawMessage(instance.Inst.FormData),
+			Status:            instance.Inst.Status,
+			SubmitterID:       instance.Inst.SubmitterID,
+			FinishedAt:        instance.Inst.FinishedAt,
+			CreatedAt:         instance.Inst.CreatedAt,
+			UpdatedAt:         instance.Inst.UpdatedAt,
+			CreatedBy:         instance.Inst.CreatedBy,
+			UpdatedBy:         instance.Inst.UpdatedBy,
+		}
+		reply = &InstanceDetailReply{Instance: detailItem}
+		if len(instance.Executions) > 0 {
+			reply.Executions = make([]ExecutionReply, 0, len(instance.Executions))
+			for _, exec := range instance.Executions {
+				reply.Executions = append(reply.Executions, ExecutionReply{
+					ID:        exec.ID,
+					InstID:    exec.InstID,
+					ParentID:  exec.ParentID,
+					NodeID:    exec.NodeID,
+					IsActive:  exec.IsActive,
+					CreatedAt: exec.CreatedAt,
+					UpdatedAt: exec.UpdatedAt,
+					CreatedBy: exec.CreatedBy,
+					UpdatedBy: exec.UpdatedBy,
+				})
+			}
+		}
+	}
+	c.JSON(http.StatusOK, reply)
 }
 
 func (h *InstanceHandler) Delete(c *gin.Context) {

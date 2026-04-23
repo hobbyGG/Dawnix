@@ -102,9 +102,10 @@ func (s *ProcessDefinitionService) validateAndBuildModel(params *biz.ProcessDefi
 		return nil, fmt.Errorf("structure is nil")
 	}
 
-	if err := validateFormDefinition(params.FormDefinition); err != nil {
-		return nil, fmt.Errorf("invalid form_definition: %w", err)
-	}
+	// 表单信息检查，暂时跳过
+	// if err := validateFormDefinition(params.FormDefinition); err != nil {
+	// 	return nil, fmt.Errorf("invalid form_definition: %w", err)
+	// }
 	if err := validateGraphStructure(params.Structure); err != nil {
 		return nil, fmt.Errorf("invalid structure graph: %w", err)
 	}
@@ -140,12 +141,12 @@ func (s *ProcessDefinitionService) validateAndBuildModel(params *biz.ProcessDefi
 	return model, nil
 }
 
-func validateFormDefinition(items []biz.FormDataItem) error {
-	if err := biz.ValidateFormDataItems(items, biz.FormValidationModeDefinition); err != nil {
-		return err
-	}
-	return nil
-}
+// func validateFormDefinition(items []biz.FormDataItem) error {
+// 	if err := biz.ValidateFormDataItems(items, biz.FormValidationModeDefinition); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 func validateEmailNodeParams(params domain.EmailNodeParams) error {
 	if params.To == "" {
@@ -171,10 +172,12 @@ func validateGraphStructure(graph *domain.GraphModel) error {
 		return fmt.Errorf("graph must contain at least one node")
 	}
 
+	// 校验node的基本信息
 	nodeByID := make(map[string]domain.NodeModel, len(graph.Nodes))
 	startCount := 0
 	endCount := 0
 	for i, node := range graph.Nodes {
+		// 每个节点的基本信息校验
 		if node.ID == "" {
 			return fmt.Errorf("node[%d].id is required", i)
 		}
@@ -186,6 +189,7 @@ func validateGraphStructure(graph *domain.GraphModel) error {
 		}
 		nodeByID[node.ID] = node
 
+		// 必须要有一个开始与结束
 		switch node.Type {
 		case domain.NodeTypeStart:
 			startCount++
@@ -200,6 +204,7 @@ func validateGraphStructure(graph *domain.GraphModel) error {
 		return fmt.Errorf("graph must contain at least one end node")
 	}
 
+	// 
 	inDegree := make(map[string]int, len(nodeByID))
 	outDegree := make(map[string]int, len(nodeByID))
 	edgeIDs := make(map[string]struct{}, len(graph.Edges))
@@ -208,10 +213,12 @@ func validateGraphStructure(graph *domain.GraphModel) error {
 			return fmt.Errorf("edge[%d].id is required", i)
 		}
 		if _, exists := edgeIDs[edge.ID]; exists {
+			// 重复的边 id 校验
 			return fmt.Errorf("duplicate edge id: %s", edge.ID)
 		}
 		edgeIDs[edge.ID] = struct{}{}
 
+		// 空边/连接不存在节点的边
 		if edge.SourceNode == "" || edge.TargetNode == "" {
 			return fmt.Errorf("edge %s source and target are required", edge.ID)
 		}
@@ -227,14 +234,24 @@ func validateGraphStructure(graph *domain.GraphModel) error {
 	}
 
 	for _, node := range graph.Nodes {
+		// 开始节点不能有入边
 		if node.Type == domain.NodeTypeStart && inDegree[node.ID] > 0 {
 			return fmt.Errorf("start node %s cannot have incoming edges", node.ID)
 		}
+
+		// 非终点不能没有出边
 		if node.Type != domain.NodeTypeEnd && outDegree[node.ID] == 0 {
 			return fmt.Errorf("node %s has no outgoing edges", node.ID)
 		}
+
+		// 终点不能有出边
 		if node.Type == domain.NodeTypeEnd && outDegree[node.ID] > 0 {
 			return fmt.Errorf("end node %s cannot have outgoing edges", node.ID)
+		}
+
+		// 非网关节点不能有多个出边
+		if !domain.IsGateway(node.Type) && outDegree[node.ID] > 1{
+			return fmt.Errorf("only gateway can have more then 1 edge")
 		}
 	}
 

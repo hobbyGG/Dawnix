@@ -52,7 +52,6 @@ func (h *ProcessDefinitionHandler) Create(c *gin.Context) {
 		writeInternalError(c, h.logger, "failt to CreateProcessDefinition", err)
 		return
 	}
-	// 对响应进行封装
 	c.JSON(http.StatusOK, gin.H{"id": id})
 }
 
@@ -69,12 +68,18 @@ func (h *ProcessDefinitionHandler) List(c *gin.Context) {
 		writeInternalError(c, h.logger, "failt to ListProcessDefinitions", err)
 		return
 	}
-	// 对响应进行封装
-	resp := &ProcessDefinitionListResp{
-		Total: int64(len(pdList)),
-		List:  pdList,
+	listItems := make([]ProcessDefinitionListItem, 0, len(pdList))
+	for _, pd := range pdList {
+		listItems = append(listItems, ProcessDefinitionListItem{
+			ID:        pd.ID,
+			Code:      pd.Code,
+			Name:      pd.Name,
+			Version:   pd.Version,
+			IsActive:  pd.IsActive,
+			CreatedAt: pd.CreatedAt,
+		})
 	}
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, ProcessDefinitionListReply{Total: int64(len(pdList)), List: listItems})
 }
 
 func (h *ProcessDefinitionHandler) Detail(c *gin.Context) {
@@ -89,8 +94,19 @@ func (h *ProcessDefinitionHandler) Detail(c *gin.Context) {
 		writeInternalError(c, h.logger, "fail to GetProcessDefinitionDetail", err)
 		return
 	}
-	// 对响应进行封装
-	c.JSON(http.StatusOK, pdDetail)
+	c.JSON(http.StatusOK, ProcessDefinitionDetailReply{
+		ID:             pdDetail.ID,
+		Code:           pdDetail.Code,
+		Version:        pdDetail.Version,
+		Name:           pdDetail.Name,
+		Structure:      json.RawMessage(pdDetail.Structure),
+		FormDefinition: json.RawMessage(pdDetail.FormDefinition),
+		IsActive:       pdDetail.IsActive,
+		CreatedAt:      pdDetail.CreatedAt,
+		UpdatedAt:      pdDetail.UpdatedAt,
+		CreatedBy:      pdDetail.CreatedBy,
+		UpdatedBy:      pdDetail.UpdatedBy,
+	})
 }
 
 func (h *ProcessDefinitionHandler) Delete(c *gin.Context) {
@@ -195,11 +211,6 @@ func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateP
 type ProcessDefinitionListReq struct {
 	Page int `form:"page" binding:"required,omitempty,min=1"`        // 页码
 	Size int `form:"size" binding:"required,omitempty,min=1,max=50"` // 每页数量
-}
-
-type ProcessDefinitionListResp struct {
-	Total int64                      `json:"total"` // 总记录数
-	List  []domain.ProcessDefinition `json:"list"`  // 流程模板列表
 }
 
 func (r *ProcessDefinitionListReq) ToBizParams() *biz.ProcessDefinitionListParams {

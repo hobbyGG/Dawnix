@@ -1,5 +1,11 @@
 package domain
 
+// type NodeType string
+
+// func (n *NodeType) IsGateway() bool {
+
+// }
+
 const (
 	NodeTypeStart            = "start"
 	NodeTypeEnd              = "end"
@@ -51,4 +57,11 @@ type EmailNodeParams struct {
 	To      string `json:"to"`
 	Subject string `json:"subject"`
 	Body    string `json:"body"`
+}
+
+func IsGateway(nodeType string) bool {
+	if nodeType != NodeTypeForkGateway && nodeType != NodeTypeInclusiveGateway && nodeType != NodeTypeXORGateway {
+		return false
+	}
+	return true
 }
