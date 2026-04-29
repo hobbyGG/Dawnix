@@ -17,6 +17,7 @@ type Scheduler struct {
 	executionRepo  ExecutionRepo
 	taskRepo       TaskRepo
 	nodeRegistry   NodeRegistry
+	RecordRepo     RecordRepo
 }
 
 type completeTaskHandler func(ctx context.Context, exec *domain.Execution, rg *RuntimeGraph) error
@@ -28,6 +29,7 @@ func NewScheduler(
 	ExecutionRepo ExecutionRepo,
 	TaskRepo TaskRepo,
 	NodeRegistry NodeRegistry,
+	RecordRepo RecordRepo, //新加进来的repo接口 不是结构体
 ) *Scheduler {
 	if TxManager == nil || DefinitionRepo == nil || InstanceRepo == nil || ExecutionRepo == nil || TaskRepo == nil {
 		panic("missing dependencies for Scheduler")
@@ -42,6 +44,7 @@ func NewScheduler(
 		executionRepo:  ExecutionRepo,
 		taskRepo:       TaskRepo,
 		nodeRegistry:   NodeRegistry,
+		RecordRepo:     RecordRepo,
 	}
 }
 
@@ -126,6 +129,15 @@ func (s *Scheduler) CompleteTask(ctx context.Context, task *domain.ProcessTask) 
 
 		if err := s.taskRepo.Update(ctx, task); err != nil {
 			return fmt.Errorf("failed to update task status: %w", err)
+		}
+        //这样写感觉还是不太合理 加入审批记录
+		record :=newRecordFromTask(task)
+		if record == nil {
+			return fmt.Errorf("failed to build approval record")
+		}
+		_, err := s.RecordRepo.Create(ctx, record)
+		if err != nil {
+			return fmt.Errorf("failed to create approval record: %w", err)
 		}
 
 		if task.Action == "reject" {
