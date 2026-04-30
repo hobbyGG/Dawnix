@@ -21,17 +21,7 @@ type RecordRepo interface {
 // data层（数据库)
 // service层（业务逻辑）
 // api层（前端接口）
-type Record struct {
-	InstanceID   int64     //`json:"instance_id"`  //这边对应的格式是jason的格式和之前的格式不一样
-	TaskID       int64     //`json:"task_id"`
-	NodeID       string    //`json:"node_id"`
-	NodeName     string    //`json:"node_name"`
-	ApproverUID  string    //`json:"approver_uid"`
-	ApproverName string    //`json:"approver_name"`
-	Action       string    //`json:"action"`
-	Comment      string    //`json:"comment"`
-	CreatedAt    time.Time //`json:"created_at"`
-}
+//核心业务实体的结构体放在domain层 biz层这里不用写
 
 func newRecordFromTask(task *domain.ProcessTask) *domain.Record {
 	if task == nil {

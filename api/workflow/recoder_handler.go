@@ -24,45 +24,38 @@ func NewRecordHandler(svc *service.RecordService, logger *zap.Logger) *RecordHan
 }
 
 func (h *RecordHandler) Register(rg *gin.RouterGroup) {
-	r := rg.Group("re")
+	r := rg.Group("record")
 	r.GET("create", h.List)
 }
 
 func (h *RecordHandler) List(c *gin.Context) {
-	//从URL 参数获取 instanceID
+	// 支持可选的 instance_id：若未提供则返回全部记录
 	instanceIDStr := c.Query("instance_id")
 	if instanceIDStr == "" {
-		h.logger.Error("instance_id is required")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": http.StatusBadRequest,
-			"msg":  "instance_id is required",
-		})
+		list, err := h.svc.ListAll(c.Request.Context())
+		if err != nil {
+			writeInternalError(c, h.logger, "failed to list approval records", err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"code": http.StatusOK, "data": list, "msg": "success"})
 		return
 	}
 
-	//转换格式
+	// 转换格式并按 instance_id 查询
 	instanceId, err := strconv.ParseInt(instanceIDStr, 10, 64)
 	if err != nil {
 		h.logger.Error("instance_id must be a valid int64", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code": http.StatusBadRequest,
-			"msg":  "instance_id must be a valid int64",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"code": http.StatusBadRequest, "msg": "instance_id must be a valid int64"})
 		return
 	}
 
-	// 调用 service
 	list, err := h.svc.ListByInstanceID(c.Request.Context(), instanceId)
 	if err != nil {
 		writeInternalError(c, h.logger, "failed to list approval records", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": http.StatusOK,
-		"data": list,
-		"msg":  "success",
-	})
+	c.JSON(http.StatusOK, gin.H{"code": http.StatusOK, "data": list, "msg": "success"})
 
 	// req := new(ListInstancesReq)
 	// if err := c.ShouldBindQuery(req); err != nil {
