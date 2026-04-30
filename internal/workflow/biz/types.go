@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 )
@@ -62,87 +61,87 @@ func DecodeFormDataItems(payload []byte) ([]FormDataItem, error) {
 	return items, nil
 }
 
-func ValidateFormDataItems(items []FormDataItem, mode FormValidationMode) error {
-	seenIdentity := make(map[string]struct{}, len(items))
-	for i, item := range items {
-		ref := formItemRef(item, i)
+// func ValidateFormDataItems(items []FormDataItem, mode FormValidationMode) error {
+// 	seenIdentity := make(map[string]struct{}, len(items))
+// 	for i, item := range items {
+// 		ref := formItemRef(item, i)
 
-		if item.ID == "" {
-			return fmt.Errorf("%s id is required", ref)
-		}
-		if item.Label == "" {
-			return fmt.Errorf("%s label is required", ref)
-		}
-		if item.Type == "" {
-			return fmt.Errorf("%s type is required", ref)
-		}
+// 		if item.ID == "" {
+// 			return fmt.Errorf("%s id is required", ref)
+// 		}
+// 		if item.Label == "" {
+// 			return fmt.Errorf("%s label is required", ref)
+// 		}
+// 		if item.Type == "" {
+// 			return fmt.Errorf("%s type is required", ref)
+// 		}
 
-		canonicalType, err := normalizeFormType(item.Type)
-		if err != nil {
-			return fmt.Errorf("%s type is invalid: %w", ref, err)
-		}
+// 		canonicalType, err := normalizeFormType(item.Type)
+// 		if err != nil {
+// 			return fmt.Errorf("%s type is invalid: %w", ref, err)
+// 		}
 
-		identity := formItemIdentity(item)
-		if _, exists := seenIdentity[identity]; exists {
-			return fmt.Errorf("%s duplicated identity: %s", ref, identity)
-		}
-		seenIdentity[identity] = struct{}{}
+// 		identity := formItemIdentity(item)
+// 		if _, exists := seenIdentity[identity]; exists {
+// 			return fmt.Errorf("%s duplicated identity: %s", ref, identity)
+// 		}
+// 		seenIdentity[identity] = struct{}{}
 
-		if len(item.Value) == 0 {
-			if mode == FormValidationModeRuntime {
-				return fmt.Errorf("%s value is required", ref)
-			}
-			continue
-		}
-		if !json.Valid(item.Value) {
-			return fmt.Errorf("%s value must be valid json", ref)
-		}
+// 		if len(item.Value) == 0 {
+// 			if mode == FormValidationModeRuntime {
+// 				return fmt.Errorf("%s value is required", ref)
+// 			}
+// 			continue
+// 		}
+// 		if !json.Valid(item.Value) {
+// 			return fmt.Errorf("%s value must be valid json", ref)
+// 		}
 
-		if err := ValidateFormValueByType(canonicalType, item.Value); err != nil {
-			return fmt.Errorf("%s value is invalid for type %s: %w", ref, canonicalType, err)
-		}
-	}
-	return nil
-}
+// 		if err := ValidateFormValueByType(canonicalType, item.Value); err != nil {
+// 			return fmt.Errorf("%s value is invalid for type %s: %w", ref, canonicalType, err)
+// 		}
+// 	}
+// 	return nil
+// }
 
-func ValidateFormValueByType(typ string, raw json.RawMessage) error {
-	switch typ {
-	case domain.FormTypeTextSingleLine:
-		var value string
-		if err := json.Unmarshal(raw, &value); err != nil {
-			return fmt.Errorf("expect string: %w", err)
-		}
-		return nil
-	case domain.FormTypeNumber:
-		var value float64
-		if err := json.Unmarshal(raw, &value); err != nil {
-			return fmt.Errorf("expect number: %w", err)
-		}
-		return nil
-	case domain.FormTypeSingleSelect:
-		var value interface{}
-		if err := json.Unmarshal(raw, &value); err != nil {
-			return fmt.Errorf("expect json primitive: %w", err)
-		}
-		switch value.(type) {
-		case string, float64, bool:
-			return nil
-		default:
-			return fmt.Errorf("expect string/number/boolean")
-		}
-	case domain.FormTypeDate:
-		var value string
-		if err := json.Unmarshal(raw, &value); err != nil {
-			return fmt.Errorf("expect RFC3339 datetime string: %w", err)
-		}
-		if _, err := time.Parse(time.RFC3339, value); err != nil {
-			return fmt.Errorf("expect RFC3339 datetime string: %w", err)
-		}
-		return nil
-	default:
-		return fmt.Errorf("unsupported form type: %s", typ)
-	}
-}
+// func ValidateFormValueByType(typ string, raw json.RawMessage) error {
+// 	switch typ {
+// 	case domain.FormTypeTextSingleLine:
+// 		var value string
+// 		if err := json.Unmarshal(raw, &value); err != nil {
+// 			return fmt.Errorf("expect string: %w", err)
+// 		}
+// 		return nil
+// 	case domain.FormTypeNumber:
+// 		var value float64
+// 		if err := json.Unmarshal(raw, &value); err != nil {
+// 			return fmt.Errorf("expect number: %w", err)
+// 		}
+// 		return nil
+// 	case domain.FormTypeSingleSelect:
+// 		var value interface{}
+// 		if err := json.Unmarshal(raw, &value); err != nil {
+// 			return fmt.Errorf("expect json primitive: %w", err)
+// 		}
+// 		switch value.(type) {
+// 		case string, float64, bool:
+// 			return nil
+// 		default:
+// 			return fmt.Errorf("expect string/number/boolean")
+// 		}
+// 	case domain.FormTypeDate:
+// 		var value string
+// 		if err := json.Unmarshal(raw, &value); err != nil {
+// 			return fmt.Errorf("expect RFC3339 datetime string: %w", err)
+// 		}
+// 		if _, err := time.Parse(time.RFC3339, value); err != nil {
+// 			return fmt.Errorf("expect RFC3339 datetime string: %w", err)
+// 		}
+// 		return nil
+// 	default:
+// 		return fmt.Errorf("unsupported form type: %s", typ)
+// 	}
+// }
 
 func FormDataItemsToMap(items []FormDataItem) (map[string]interface{}, error) {
 	values := make(map[string]interface{}, len(items))

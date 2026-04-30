@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -39,7 +40,29 @@ func (h *TaskHandler) Detail(c *gin.Context) {
 		writeInternalError(c, h.logger, "failed to get task detail", err)
 		return
 	}
-	c.JSON(http.StatusOK, taskDetailView)
+	var reply *TaskDetailReply
+	if taskDetailView != nil {
+		reply = &TaskDetailReply{
+			ID:           taskDetailView.ID,
+			InstanceID:   taskDetailView.InstanceID,
+			ExecutionID:  taskDetailView.ExecutionID,
+			NodeID:       taskDetailView.NodeID,
+			Type:         taskDetailView.Type,
+			Assignee:     taskDetailView.Assignee,
+			Candidates:   append([]string(nil), taskDetailView.Candidates...),
+			Status:       taskDetailView.Status,
+			Action:       taskDetailView.Action,
+			Comment:      taskDetailView.Comment,
+			FormData:     json.RawMessage(taskDetailView.FormData),
+			CreatedAt:    taskDetailView.CreatedAt,
+			UpdatedAt:    taskDetailView.UpdatedAt,
+			CreatedBy:    taskDetailView.CreatedBy,
+			UpdatedBy:    taskDetailView.UpdatedBy,
+			ProcessTitle: taskDetailView.ProcessTitle,
+			SubmitterID:  taskDetailView.SubmitterID,
+		}
+	}
+	c.JSON(http.StatusOK, reply)
 }
 
 func (h *TaskHandler) List(c *gin.Context) {
@@ -71,7 +94,21 @@ func (h *TaskHandler) List(c *gin.Context) {
 		writeInternalError(c, h.logger, "failed to list tasks", err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"total": total, "tasks": taskListView})
+	listItems := make([]TaskViewReply, 0, len(taskListView))
+	for _, task := range taskListView {
+		if task == nil {
+			continue
+		}
+		listItems = append(listItems, TaskViewReply{
+			ID:            task.ID,
+			TaskName:      task.TaskName,
+			Status:        task.Status,
+			ProcessTitle:  task.ProcessTitle,
+			SubmitterName: task.SubmitterName,
+			ArrivedAt:     task.ArrivedAt,
+		})
+	}
+	c.JSON(http.StatusOK, TaskListReply{Total: total, List: listItems})
 }
 
 func (h *TaskHandler) Complete(c *gin.Context) {
