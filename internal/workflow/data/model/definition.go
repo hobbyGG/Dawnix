@@ -3,7 +3,7 @@ package model
 import (
 	"gorm.io/datatypes"
 
-	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
+	"github.com/hobbyGG/Dawnix/internal/workflow/domain" //这个文件夹里有什么？
 )
 
 type ProcessDefinition struct {

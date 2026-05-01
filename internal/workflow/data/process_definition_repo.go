@@ -31,7 +31,7 @@ func (repo *ProcessDefinitionRepo) Create(ctx context.Context, pd *domain.Proces
 	if err := repo.db.DB(ctx).WithContext(ctx).Create(poPD).Error; err != nil {
 		return -1, err
 	}
-	pd.ID = poPD.ID
+	pd.ID = poPD.ID // 将数据库生成的ID回写到domain对象中
 	return poPD.ID, nil
 }
 

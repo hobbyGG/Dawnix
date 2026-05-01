@@ -13,6 +13,7 @@ type InstanceRepo struct {
 	db *Data
 }
 
+//构造方法返回biz层
 func NewInstanceRepo(db *Data) biz.InstanceRepo {
 	return &InstanceRepo{
 		db: db,

@@ -61,6 +61,8 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 		&dataModel.ProcessTask{},
 		&dataModel.ProcessInstance{},
 		&dataModel.Execution{},
+		//&dataModel.ProcessInstanceHistory{},//新添加的ProcessInstanceHistory模型 2026.4.23
+		&dataModel.Record{},
 		&authModel.User{},
 		&authModel.AuthIdentity{},
 	)
@@ -84,6 +86,7 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 	instanceRepo := data.NewInstanceRepo(dataObj)
 	executionRepo := data.NewExecutionRepo(dataObj)
 	taskRepo := data.NewTaskRepo(dataObj)
+	RecordRepo := data.NewRecordRepo(dataObj)
 
 	// MQ 初始化（基础设施实现位于 data 层）
 	mq := data.NewRedisMQ(rdb)
@@ -105,6 +108,7 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 		executionRepo,
 		taskRepo,
 		nodeRegistry,
+		RecordRepo,
 	)
 
 	processDefinitionSvc := service.NewProcessDefinitionService(processDefinitionRepo, logger, cfg.Biz.Features.EmailService.Enabled)
@@ -112,6 +116,10 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 
 	instanceSvc := service.NewInstanceService(instanceRepo, scheduler, logger)
 	instanceHandler := workflow.NewInstanceHandler(instanceSvc, logger)
+
+	//新加Record接口
+	recordSvc := service.NewRecordService(RecordRepo, logger)
+	recordHandler := workflow.NewRecordHandler(recordSvc, logger)
 
 	taskSvc := service.NewTaskService(taskRepo, scheduler, logger, cfg.Biz.Task.DefaultScope)
 	taskHandler := workflow.NewTaskHandler(taskSvc, logger)
@@ -141,6 +149,7 @@ func NewAppManual(logger *zap.Logger, cfg *conf.Bootstrap) (*App, error) {
 		enumHandler,
 		instanceHandler,
 		taskHandler,
+		recordHandler,
 	)
 
 	app := &App{
