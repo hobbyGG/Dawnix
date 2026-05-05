@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 )
@@ -9,7 +10,7 @@ import (
 type ProcessDefinitionCreateParams struct {
 	Name           string
 	Code           string
-	Structure      *domain.GraphModel
+	Structure      json.RawMessage
 	FormDefinition []FormDataItem
 }
 

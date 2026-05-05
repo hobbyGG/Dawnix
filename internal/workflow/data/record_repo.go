@@ -27,8 +27,8 @@ func (repo *RecordRepo) Create(ctx context.Context, record *domain.Record) (int6
 		return -1, errors.New("repo: creation model cannot be nil")
 	}
 
-	recordPO := recordTOPO(record)
-	// repo := recordTOPO(record) // domain dataModel
+	recordPO := recordToModel(record)
+	// repo := recordToModel(record) // domain dataModel
 	if err := repo.db.DB(ctx).WithContext(ctx).Create(recordPO).Error; err != nil {
 		return -1, err
 	}
@@ -92,7 +92,7 @@ func (repo *RecordRepo) ListAll(ctx context.Context) ([]*domain.Record, error) {
 
 // 工具方法：domain → dataModel
 // -------------------------------------------------------
-func recordTOPO(d *domain.Record) *dataModel.Record {
+func recordToModel(d *domain.Record) *dataModel.Record {
 	if d == nil {
 		return nil //如果传入的domain对象为nil 就返回nil 这样就不会创建一条空记录了
 	}

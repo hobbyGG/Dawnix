@@ -20,7 +20,7 @@ func NewExecutionRepo(db *Data) biz.ExecutionRepo {
 var _ biz.ExecutionRepo = (*ExecutionRepo)(nil)
 
 func (repo *ExecutionRepo) Create(ctx context.Context, exec *domain.Execution) error {
-	poExec := executionToPO(exec)
+	poExec := executionToModel(exec)
 	if err := repo.db.DB(ctx).WithContext(ctx).Create(poExec).Error; err != nil {
 		return fmt.Errorf("create execution: %w", err)
 	}
@@ -30,7 +30,7 @@ func (repo *ExecutionRepo) Create(ctx context.Context, exec *domain.Execution) e
 
 func (repo *ExecutionRepo) CreateBatch(ctx context.Context, execs []domain.Execution) error {
 	for i := range execs {
-		poExec := executionToPO(&execs[i])
+		poExec := executionToModel(&execs[i])
 		if err := repo.db.DB(ctx).WithContext(ctx).Create(poExec).Error; err != nil {
 			return fmt.Errorf("create execution batch item: %w", err)
 		}
@@ -66,7 +66,7 @@ func (repo *ExecutionRepo) GetActiveNumsByParentID(ctx context.Context, parentID
 }
 
 func (repo *ExecutionRepo) Update(ctx context.Context, exec *domain.Execution) error {
-	if err := repo.db.DB(ctx).WithContext(ctx).Save(executionToPO(exec)).Error; err != nil {
+	if err := repo.db.DB(ctx).WithContext(ctx).Save(executionToModel(exec)).Error; err != nil {
 		return fmt.Errorf("update execution id %d: %w", exec.ID, err)
 	}
 	return nil
@@ -83,7 +83,7 @@ func (repo *ExecutionRepo) DeleteByID(ctx context.Context, id int64) error {
 	return nil
 }
 
-func executionToPO(src *domain.Execution) *dataModel.Execution {
+func executionToModel(src *domain.Execution) *dataModel.Execution {
 	if src == nil {
 		return nil
 	}

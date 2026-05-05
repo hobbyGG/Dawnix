@@ -6,14 +6,14 @@ import (
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
+	"gorm.io/datatypes"
 )
 
 // 定义了req->model的转换方法
 
 func paramsToProcessDef(params *biz.ProcessDefinitionCreateParams) (*domain.ProcessDefinition, error) {
-	strctureJson, err := json.Marshal(params.Structure)
-	if err != nil {
-		return nil, fmt.Errorf("fail to marshal structure: %w", err)
+	if params == nil {
+		return nil, fmt.Errorf("params is nil")
 	}
 	if params.FormDefinition == nil {
 		params.FormDefinition = []biz.FormDataItem{}
@@ -26,7 +26,7 @@ func paramsToProcessDef(params *biz.ProcessDefinitionCreateParams) (*domain.Proc
 	return &domain.ProcessDefinition{
 		Code:           params.Code,
 		Name:           params.Name,
-		Structure:      strctureJson,
+		Structure:      datatypes.JSON(params.Structure),
 		FormDefinition: formDefinitionJSON,
 	}, nil
 }

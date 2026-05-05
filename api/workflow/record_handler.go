@@ -25,7 +25,7 @@ func NewRecordHandler(svc *service.RecordService, logger *zap.Logger) *RecordHan
 
 func (h *RecordHandler) Register(rg *gin.RouterGroup) {
 	r := rg.Group("record")
-	r.GET("create", h.List)
+	r.GET("list", h.List)
 }
 
 func (h *RecordHandler) List(c *gin.Context) {

@@ -18,8 +18,9 @@ const (
 )
 
 type GraphModel struct {
-	Nodes []NodeModel `json:"nodes"`
-	Edges []EdgeModel `json:"edges"`
+	Nodes    []NodeModel            `json:"nodes"`
+	Edges    []EdgeModel            `json:"edges"`
+	Viewport map[string]interface{} `json:"viewport,omitempty"`
 }
 
 func (g *GraphModel) EdgesBySource() map[string][]EdgeModel {
@@ -39,6 +40,10 @@ type NodeModel struct {
 	Name       string     `json:"name"`
 	Candidates Candidates `json:"candidates,omitempty"`
 	Properties []byte     `json:"properties,omitempty"`
+	Position   struct {
+		X float64 `json:"x"`
+		Y float64 `json:"y"`
+	} `json:"position,omitempty"`
 }
 
 type EdgeModel struct {

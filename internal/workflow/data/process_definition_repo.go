@@ -27,7 +27,7 @@ func (repo *ProcessDefinitionRepo) Create(ctx context.Context, pd *domain.Proces
 	if pd == nil {
 		return -1, errors.New("repo: creation model cannot be nil")
 	}
-	poPD := processDefinitionToPO(pd)
+	poPD := processDefinitionToModel(pd)
 	if err := repo.db.DB(ctx).WithContext(ctx).Create(poPD).Error; err != nil {
 		return -1, err
 	}
@@ -85,10 +85,10 @@ func (repo *ProcessDefinitionRepo) DeleteByID(ctx context.Context, id int64) err
 
 func (repo *ProcessDefinitionRepo) Update(ctx context.Context, pd *domain.ProcessDefinition) error {
 	// 这里实现更新流程模板的数据库操作
-	return repo.db.DB(ctx).WithContext(ctx).Save(processDefinitionToPO(pd)).Error
+	return repo.db.DB(ctx).WithContext(ctx).Save(processDefinitionToModel(pd)).Error
 }
 
-func processDefinitionToPO(src *domain.ProcessDefinition) *dataModel.ProcessDefinition {
+func processDefinitionToModel(src *domain.ProcessDefinition) *dataModel.ProcessDefinition {
 	if src == nil {
 		return nil
 	}

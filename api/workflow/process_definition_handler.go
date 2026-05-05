@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
-	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 	"github.com/hobbyGG/Dawnix/internal/workflow/service"
 	"go.uber.org/zap"
 )
@@ -139,71 +138,15 @@ func (h *ProcessDefinitionHandler) Update(c *gin.Context) {
 type ProcessDefinitionCreateReq struct {
 	Code           string             `json:"code"`                         // 流程模板业务号，用于创建流程
 	Name           string             `json:"name" binding:"required"`      // 流程模板名称
-	Structure      ProcessStructure   `json:"structure" binding:"required"` // 流程模板图结构
+	Structure      json.RawMessage    `json:"structure" binding:"required"` // 流程模板图结构
 	FormDefinition []biz.FormDataItem `json:"form_definition"`              // 表单定义项列表
 }
 
-// ProcessStructure 对应 ReactFlow 的导出对象
-type ProcessStructure struct {
-	// Nodes: 节点列表 (包含 id, type, data, position)
-	Nodes []ProcessNode `json:"nodes" binding:"required"`
-
-	// Edges: 连线列表 (包含 source, target, id)
-	Edges []ProcessEdge `json:"edges" binding:"required"`
-
-	// Viewport: 视口状态 (x, y, zoom)，用于用户下次打开时恢复视角
-	Viewport map[string]interface{} `json:"viewport"`
-}
-
-type ProcessNode struct {
-	ID         string            `json:"id"`                   // 节点ID
-	Type       string            `json:"type"`                 // 节点类型
-	Name       string            `json:"name"`                 // 节点展示的名称
-	Candidates domain.Candidates `json:"candidates,omitempty"` // 候选人，仅用户任务节点有效
-
-	Properties json.RawMessage `json:"properties,omitempty"` // 其他属性，针对不同类型节点的特有属性，例如邮件服务节点的邮件参数等
-}
-
-type ProcessEdge struct {
-	ID         string `json:"id"`     // 边ID
-	SourceNode string `json:"source"` // 源节点ID
-	TargetNode string `json:"target"` // 目标节点ID
-	Condition  string `json:"condition"`
-	IsDefault  bool   `json:"is_default"`
-}
-
 func (r *ProcessDefinitionCreateReq) ToBizParams() *biz.ProcessDefinitionCreateParams {
-	// 这里需要将 ProcessStructure 转换为 graph结构
-	graph := domain.GraphModel{
-		Nodes: []domain.NodeModel{},
-		Edges: []domain.EdgeModel{},
-	}
-	// 转换 Nodes
-	for _, node := range r.Structure.Nodes {
-		workflowNode := domain.NodeModel{
-			ID:         node.ID,
-			Type:       node.Type,
-			Name:       node.Name,
-			Candidates: node.Candidates,
-			Properties: node.Properties,
-		}
-		graph.Nodes = append(graph.Nodes, workflowNode)
-	}
-	// 转换 Edges
-	for _, edge := range r.Structure.Edges {
-		workflowEdge := domain.EdgeModel{
-			ID:         edge.ID,
-			SourceNode: edge.SourceNode,
-			TargetNode: edge.TargetNode,
-			Condition:  edge.Condition,
-			IsDefault:  edge.IsDefault,
-		}
-		graph.Edges = append(graph.Edges, workflowEdge)
-	}
 	return &biz.ProcessDefinitionCreateParams{
 		Name:           r.Name,
 		Code:           r.Code,
-		Structure:      &graph,
+		Structure:      r.Structure,
 		FormDefinition: r.FormDefinition,
 	}
 }

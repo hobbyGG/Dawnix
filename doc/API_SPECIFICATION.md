@@ -180,7 +180,7 @@
 - **接口**: `POST /api/v1/definition/create`
 - **请求体关键字段**:
   - `name` 必填
-  - `structure` 必填（`nodes`、`edges`）
+  - `structure` 必填，原样传入流程图 JSON，保留节点 `position`、画布 `viewport` 等布局信息
   - `code` 当前代码未做必填校验（建议传）
   - `form_definition` 结构为 `[{id,label,type,value}]`
 
@@ -238,7 +238,7 @@
 - **请求体关键字段**:
   - `id` 必填，流程定义 ID
   - `name` 必填
-  - `structure` 必填（`nodes`、`edges`）
+  - `structure` 必填，原样传入流程图 JSON，保留节点 `position`、画布 `viewport` 等布局信息
 - **响应体**:
 
 ```json
@@ -472,6 +472,40 @@
 
 ---
 
+## 5. Record
+
+### 5.1 获取审批记录列表
+- **接口**: `GET /api/v1/record/list`
+- **Query 参数**:
+  - `instance_id` (可选, int64): 按流程实例 ID 过滤记录。若不提供，则返回所有记录。
+
+- **响应体**:
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": [
+    {
+      "id": 1,
+      "instance_id": 10,
+      "node_id": "Activity_1",
+      "operator_id": "root",
+      "action": "agree",
+      "comment": "已审批同意",
+      "created_at": "2026-05-05T12:00:00Z",
+      "updated_at": "2026-05-05T12:00:00Z",
+      "deleted_at": null
+    }
+  ]
+}
+```
+
+- **代码位置**:
+  - Handler: `api/workflow/record_handler.go#List`
+  - Service: `internal/workflow/service/record_service.go#ListByInstanceID` / `ListAll`
+
+---
+
 ## 数据结构（当前实现）
 
 ### FormDataItem
@@ -496,8 +530,13 @@
 
 ### ProcessStructure
 
-请求体（Definition Create/Update）里的 `structure.edges` 字段使用 `source/target`。  
-落库后领域模型中的边字段为 `source_node/target_node`（`internal/workflow/domain/workflow.go`）。
+创建/更新流程定义时，`structure` 直接接收前端传入的完整流程图 JSON，不再先转成 runtime graph 再入库。这样可以保留：
+
+- 节点坐标：`structure.nodes[].position.x/y`
+- 画布视口：`structure.viewport`
+- 连线信息：`structure.edges[].source/target`
+
+当前后端只会在校验阶段临时反序列化结构图用于业务规则校验，持久化时保留原始 JSON。
 
 用户任务节点的审批人配置在 `structure.nodes[].candidates.users`，元素必须是 `uid` 字符串数组。  
 建议通过 `GET /api/v1/enum/approvers` 获取前端展示用枚举（`label=姓名`，`value=uid`），提交时仅传 `uid`。

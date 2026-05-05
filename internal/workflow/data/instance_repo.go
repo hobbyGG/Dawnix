@@ -21,7 +21,7 @@ func NewInstanceRepo(db *Data) biz.InstanceRepo {
 }
 
 func (repo *InstanceRepo) Create(ctx context.Context, inst *domain.ProcessInstance) (int64, error) {
-	poInst := processInstanceToPO(inst)
+	poInst := processInstanceToModel(inst)
 	if err := repo.db.DB(ctx).WithContext(ctx).Create(poInst).Error; err != nil {
 		return 0, err
 	}
@@ -78,7 +78,7 @@ func (repo *InstanceRepo) Delete(ctx context.Context, id int64) error {
 }
 
 func (repo *InstanceRepo) Update(ctx context.Context, inst *domain.ProcessInstance) error {
-	if err := repo.db.DB(ctx).WithContext(ctx).Save(processInstanceToPO(inst)).Error; err != nil {
+	if err := repo.db.DB(ctx).WithContext(ctx).Save(processInstanceToModel(inst)).Error; err != nil {
 		return err
 	}
 	return nil
@@ -88,7 +88,7 @@ func (repo *InstanceRepo) UpdateStatus(ctx context.Context, id int64, status str
 	return repo.db.DB(ctx).WithContext(ctx).Model(&dataModel.ProcessInstance{}).Where("id = ?", id).Update("status", status).Error
 }
 
-func processInstanceToPO(src *domain.ProcessInstance) *dataModel.ProcessInstance {
+func processInstanceToModel(src *domain.ProcessInstance) *dataModel.ProcessInstance {
 	if src == nil {
 		return nil
 	}

@@ -23,7 +23,7 @@ func NewTaskRepo(db *Data) biz.TaskRepo {
 var _ biz.TaskRepo = (*TaskRepo)(nil)
 
 func (repo *TaskRepo) Create(ctx context.Context, task *domain.ProcessTask) error {
-	poTask := processTaskToPO(task)
+	poTask := processTaskToModel(task)
 	if err := repo.db.DB(ctx).WithContext(ctx).Create(poTask).Error; err != nil {
 		return fmt.Errorf("create process task: %w", err)
 	}
@@ -141,13 +141,13 @@ func (r *TaskRepo) ListWithFilter(ctx context.Context, params *biz.ListTasksPara
 }
 
 func (repo *TaskRepo) Update(ctx context.Context, task *domain.ProcessTask) error {
-	if err := repo.db.DB(ctx).WithContext(ctx).Save(processTaskToPO(task)).Error; err != nil {
+	if err := repo.db.DB(ctx).WithContext(ctx).Save(processTaskToModel(task)).Error; err != nil {
 		return fmt.Errorf("update process task id %d: %w", task.ID, err)
 	}
 	return nil
 }
 
-func processTaskToPO(src *domain.ProcessTask) *dataModel.ProcessTask {
+func processTaskToModel(src *domain.ProcessTask) *dataModel.ProcessTask {
 	if src == nil {
 		return nil
 	}

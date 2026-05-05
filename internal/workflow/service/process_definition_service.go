@@ -102,24 +102,29 @@ func (s *ProcessDefinitionService) validateAndBuildModel(params *biz.ProcessDefi
 		return nil, fmt.Errorf("structure is nil")
 	}
 
+	var graph domain.GraphModel
+	if err := json.Unmarshal(params.Structure, &graph); err != nil {
+		return nil, fmt.Errorf("invalid structure json: %w", err)
+	}
+
 	// 表单信息检查，暂时跳过
 	// if err := validateFormDefinition(params.FormDefinition); err != nil {
 	// 	return nil, fmt.Errorf("invalid form_definition: %w", err)
 	// }
-	if err := validateGraphStructure(params.Structure); err != nil {
+	if err := validateGraphStructure(&graph); err != nil {
 		return nil, fmt.Errorf("invalid structure graph: %w", err)
 	}
-	if err := validateUserTaskApprovers(params.Structure); err != nil {
+	if err := validateUserTaskApprovers(&graph); err != nil {
 		return nil, fmt.Errorf("invalid structure approvers: %w", err)
 	}
-	if err := validateXORRoutingRules(params.Structure); err != nil {
+	if err := validateXORRoutingRules(&graph); err != nil {
 		return nil, fmt.Errorf("invalid structure routing rules: %w", err)
 	}
-	if err := validateInclusiveRoutingRules(params.Structure); err != nil {
+	if err := validateInclusiveRoutingRules(&graph); err != nil {
 		return nil, fmt.Errorf("invalid structure routing rules: %w", err)
 	}
 
-	for _, node := range params.Structure.Nodes {
+	for _, node := range graph.Nodes {
 		if node.Type == domain.NodeTypeEmailService {
 			if !s.emailServiceEnabled {
 				return nil, fmt.Errorf("email service node is disabled")
@@ -204,7 +209,7 @@ func validateGraphStructure(graph *domain.GraphModel) error {
 		return fmt.Errorf("graph must contain at least one end node")
 	}
 
-	// 
+	//
 	inDegree := make(map[string]int, len(nodeByID))
 	outDegree := make(map[string]int, len(nodeByID))
 	edgeIDs := make(map[string]struct{}, len(graph.Edges))
@@ -250,7 +255,7 @@ func validateGraphStructure(graph *domain.GraphModel) error {
 		}
 
 		// 非网关节点不能有多个出边
-		if !domain.IsGateway(node.Type) && outDegree[node.ID] > 1{
+		if !domain.IsGateway(node.Type) && outDegree[node.ID] > 1 {
 			return fmt.Errorf("only gateway can have more then 1 edge")
 		}
 	}
