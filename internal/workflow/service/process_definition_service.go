@@ -26,10 +26,15 @@ func NewProcessDefinitionService(repo biz.ProcessDefinitionRepo, logger *zap.Log
 }
 
 func (s *ProcessDefinitionService) CreateProcessDefinition(c context.Context, params *biz.ProcessDefinitionCreateParams) (int64, error) {
-	model, err := s.validateAndBuildModel(params)
-	if err != nil {
+	if err := s.validateCreateParams(params); err != nil {
 		return 0, err
 	}
+
+	model, err := paramsToProcessDef(params)
+	if err != nil {
+		return 0, fmt.Errorf("convert request to model failed: %w", err)
+	}
+
 	id, err := s.repo.Create(c, model)
 	if err != nil {
 		return 0, fmt.Errorf("create failed: %w", err)
@@ -73,9 +78,13 @@ func (s *ProcessDefinitionService) UpdateProcessDefinition(ctx context.Context, 
 		return fmt.Errorf("get processDefinition by id failed: %w", err)
 	}
 
-	model, err := s.validateAndBuildModel(params)
-	if err != nil {
+	if err := s.validateCreateParams(params); err != nil {
 		return err
+	}
+
+	model, err := paramsToProcessDef(params)
+	if err != nil {
+		return fmt.Errorf("convert request to model failed: %w", err)
 	}
 
 	model.ID = existModel.ID
@@ -93,57 +102,48 @@ func (s *ProcessDefinitionService) UpdateProcessDefinition(ctx context.Context, 
 	}
 	return nil
 }
-
-func (s *ProcessDefinitionService) validateAndBuildModel(params *biz.ProcessDefinitionCreateParams) (*domain.ProcessDefinition, error) {
+func (s *ProcessDefinitionService) validateCreateParams(params *biz.ProcessDefinitionCreateParams) error {
 	if params == nil {
-		return nil, fmt.Errorf("params is nil")
+		return fmt.Errorf("params is nil")
 	}
 	if params.Structure == nil {
-		return nil, fmt.Errorf("structure is nil")
+		return fmt.Errorf("structure is nil")
 	}
 
 	var graph domain.GraphModel
 	if err := json.Unmarshal(params.Structure, &graph); err != nil {
-		return nil, fmt.Errorf("invalid structure json: %w", err)
+		return fmt.Errorf("invalid structure json: %w", err)
 	}
 
-	// 表单信息检查，暂时跳过
-	// if err := validateFormDefinition(params.FormDefinition); err != nil {
-	// 	return nil, fmt.Errorf("invalid form_definition: %w", err)
-	// }
 	if err := validateGraphStructure(&graph); err != nil {
-		return nil, fmt.Errorf("invalid structure graph: %w", err)
+		return fmt.Errorf("invalid structure graph: %w", err)
 	}
 	if err := validateUserTaskApprovers(&graph); err != nil {
-		return nil, fmt.Errorf("invalid structure approvers: %w", err)
+		return fmt.Errorf("invalid structure approvers: %w", err)
 	}
 	if err := validateXORRoutingRules(&graph); err != nil {
-		return nil, fmt.Errorf("invalid structure routing rules: %w", err)
+		return fmt.Errorf("invalid structure routing rules: %w", err)
 	}
 	if err := validateInclusiveRoutingRules(&graph); err != nil {
-		return nil, fmt.Errorf("invalid structure routing rules: %w", err)
+		return fmt.Errorf("invalid structure routing rules: %w", err)
 	}
 
 	for _, node := range graph.Nodes {
 		if node.Type == domain.NodeTypeEmailService {
 			if !s.emailServiceEnabled {
-				return nil, fmt.Errorf("email service node is disabled")
+				return fmt.Errorf("email service node is disabled")
 			}
 			var emailParams domain.EmailNodeParams
 			if err := json.Unmarshal(node.Properties, &emailParams); err != nil {
-				return nil, fmt.Errorf("fail to unmarshal email service properties: %w", err)
+				return fmt.Errorf("fail to unmarshal email service properties: %w", err)
 			}
 			if err := validateEmailNodeParams(emailParams); err != nil {
-				return nil, fmt.Errorf("invalid email service properties: %w", err)
+				return fmt.Errorf("invalid email service properties: %w", err)
 			}
 		}
 	}
 
-	model, err := paramsToProcessDef(params)
-	if err != nil {
-		return nil, fmt.Errorf("convert request to model failed: %w", err)
-	}
-	return model, nil
+	return nil
 }
 
 // func validateFormDefinition(items []biz.FormDataItem) error {

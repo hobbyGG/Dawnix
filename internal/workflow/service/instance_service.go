@@ -35,12 +35,12 @@ func (s *InstanceService) CreateInstance(ctx context.Context, params *biz.StartP
 	return id, nil
 }
 
-func (s *InstanceService) ListInstances(ctx context.Context, params *biz.ListInstancesParams) ([]domain.ProcessInstance, error) {
-	instances, err := s.instanceRepo.List(ctx, params)
+func (s *InstanceService) ListInstances(ctx context.Context, params *biz.ListInstancesParams) ([]domain.ProcessInstance, int64, error) {
+	instances, total, err := s.instanceRepo.List(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("list instances failed: %w", err)
+		return nil, 0, fmt.Errorf("list instances failed: %w", err)
 	}
-	return instances, nil
+	return instances, total, nil
 }
 
 func (s *InstanceService) GetInstanceDetail(ctx context.Context, id int64) (*InstanceDetail, error) {

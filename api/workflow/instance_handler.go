@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hobbyGG/Dawnix/internal/workflow/biz"
@@ -60,7 +61,7 @@ func (h *InstanceHandler) List(c *gin.Context) {
 		writeBindError(c, h.logger, "failed to bind ListInstancesReq", err)
 		return
 	}
-	instances, err := h.svc.ListInstances(c.Request.Context(), req.ToBizParams())
+	instances, total, err := h.svc.ListInstances(c.Request.Context(), req.ToBizParams())
 	if err != nil {
 		writeInternalError(c, h.logger, "failed to list instances", err)
 		return
@@ -78,7 +79,7 @@ func (h *InstanceHandler) List(c *gin.Context) {
 			FinishedAt:  inst.FinishedAt,
 		})
 	}
-	c.JSON(http.StatusOK, InstanceListReply{Total: int64(len(instances)), List: listItems})
+	c.JSON(http.StatusOK, InstanceListReply{Total: total, List: listItems})
 }
 
 func (h *InstanceHandler) Detail(c *gin.Context) {
@@ -169,14 +170,36 @@ func (r *CreateInstanceReq) ToBizParams() *biz.StartProcessInstanceParams {
 }
 
 type ListInstancesReq struct {
-	Page int `form:"page" binding:"omitempty,min=1"`
-	Size int `form:"size" binding:"omitempty,min=1,max=100"`
+	Page          int       `form:"page" binding:"omitempty,min=1"`
+	Size          int       `form:"size" binding:"omitempty,min=1,max=100"`
+	State         string    `form:"state" binding:"omitempty,oneof=all unfinished finished"`
+	SubmitterID   string    `form:"submitter_id"`
+	ProcessCode   string    `form:"process_code"`
+	CreatedAtFrom time.Time `form:"created_at_from"`
+	CreatedAtTo   time.Time `form:"created_at_to"`
 }
 
 func (r *ListInstancesReq) ToBizParams() *biz.ListInstancesParams {
+	page := r.Page
+	if page <= 0 {
+		page = 1
+	}
+	size := r.Size
+	if size <= 0 {
+		size = 20
+	}
+	state := r.State
+	if state == "" {
+		state = biz.ListInstancesStateAll
+	}
 	return &biz.ListInstancesParams{
-		Page: r.Page,
-		Size: r.Size,
+		Page:          page,
+		Size:          size,
+		State:         state,
+		SubmitterID:   r.SubmitterID,
+		ProcessCode:   r.ProcessCode,
+		CreatedAtFrom: r.CreatedAtFrom,
+		CreatedAtTo:   r.CreatedAtTo,
 	}
 }
 

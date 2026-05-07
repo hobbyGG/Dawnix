@@ -307,12 +307,51 @@
 
 ### 3.2 实例列表
 
-- **接口**: `GET /api/v1/instance/list?page=1&size=20`
-- **参数约束**: `page>=1`，`1<=size<=100`
-- **响应**: 数组，元素为 `domain.ProcessInstance`
-- **注意**: `page/size` 未设置默认值，建议显式传参。
+- **接口**: `GET /api/v1/instance/list`
+- **请求参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `page` | int | 否 | 页码，最小值1，默认值1 |
+| `size` | int | 否 | 每页数量，范围1-100，默认值20 |
+| `state` | string | 否 | 实例状态筛选：`all` / `finished` / `unfinished`，默认`all` |
+| `submitter_id` | string | 否 | 提交人ID，精确匹配 |
+| `process_code` | string | 否 | 流程标识，精确匹配 |
+| `created_at_from` | datetime | 否 | 创建时间范围起点（RFC3339格式） |
+| `created_at_to` | datetime | 否 | 创建时间范围终点（RFC3339格式） |
+
+- **响应体**:
+
+```json
+{
+  "total": 2,
+  "list": [
+    {
+      "id": 100,
+      "process_code": "leave_request",
+      "process_name": "",
+      "status": "IN_PROGRESS",
+      "submitter_id": "1980531045852420096",
+      "created_at": "2026-04-21T13:00:00+08:00",
+      "finished_at": null
+    },
+    {
+      "id": 99,
+      "process_code": "leave_request",
+      "process_name": "",
+      "status": "FINISHED",
+      "submitter_id": "1980531045852420096",
+      "created_at": "2026-04-21T12:00:00+08:00",
+      "finished_at": "2026-04-21T12:30:00+08:00"
+    }
+  ]
+}
+```
+
+- **状态码**: `200`/`400`/`500`
 - **代码位置**:
   - Handler: `api/workflow/instance_handler.go#List`
+  - Service: `internal/workflow/service/instance_service.go#ListInstances`
   - Repo: `internal/workflow/data/instance_repo.go#List`
 
 ### 3.3 实例详情
@@ -400,34 +439,49 @@
 
 ### 4.2 任务列表
 
-- **接口**: `GET /api/v1/task/list?page=1&size=10&scope=my_pending`
-- **参数**:
-  - `page` 默认 1（handler 内补默认）
-  - `size` 默认 10（handler 内补默认，最大 100）
-  - `scope` 支持：`my_todo`/`my_pending`/`my_completed`/`all_pending`/`all_completed`
+- **接口**: `GET /api/v1/task/list`
+- **请求参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `page` | int | 否 | 页码，最小值1，默认值1 |
+| `size` | int | 否 | 每页数量，范围1-100，默认值10 |
+| `scope` | string | 否 | 任务范围过滤：`my_pending` / `my_completed` / `all_pending` / `all_completed` |
 
 - **响应体**:
 
 ```json
 {
   "total": 5,
-  "tasks": [
+  "list": [
     {
-      "ID": 200,
-      "TaskName": "经理审批",
-      "Status": "PENDING",
-      "ProcessTitle": "请假审批流程",
-      "SubmitterName": "user_123",
-      "ArrivedAt": "2026-04-21T13:00:00+08:00"
+      "id": 200,
+      "task_name": "经理审批",
+      "status": "PENDING",
+      "process_title": "请假审批流程",
+      "submitter_name": "user_123",
+      "arrived_at": "2026-04-21T13:00:00+08:00"
     }
   ]
 }
 ```
 
-- **当前实现说明**:
-  1. `my_todo/my_pending/all_pending` -> 状态过滤为 `PENDING`
-  2. `my_completed/all_completed` -> 状态过滤为 `APPROVED`
-  3. repo 层始终按当前用户做身份过滤，因此 `all_*` 当前并非“全员可见”
+- **响应字段说明**:
+  - `total`: 总任务数
+  - `list`: 任务列表
+    - `id`: 任务ID
+    - `task_name`: 任务名称
+    - `status`: 任务状态（PENDING/APPROVED/REJECTED等）
+    - `process_title`: 流程标题
+    - `submitter_name`: 流程提交人名称
+    - `arrived_at`: 任务到达时间
+
+- **Scope 说明**:
+  - `my_pending`: 当前用户的待审批任务
+  - `my_completed`: 当前用户已完成的任务
+  - `all_pending`: 所有待审批任务（当前仅限已登录用户可见）
+  - `all_completed`: 所有已完成的任务（当前仅限已登录用户可见）
+
 - **代码位置**:
   - Handler: `api/workflow/task_handler.go#List`
   - Service: `internal/workflow/service/task_service.go#ListTasksView`

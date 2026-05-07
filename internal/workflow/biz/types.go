@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 )
@@ -207,22 +206,6 @@ func formItemRef(item FormDataItem, idx int) string {
 		return fmt.Sprintf("item[%d](label=%s)", idx, item.Label)
 	}
 	return fmt.Sprintf("item[%d]", idx)
-}
-
-func normalizeFormType(rawType string) (string, error) {
-	normalized := strings.ToLower(rawType)
-	if normalized == "" {
-		return "", fmt.Errorf("type is empty")
-	}
-	if canonical, ok := formTypeAliasToCanonical[normalized]; ok {
-		return canonical, nil
-	}
-	switch normalized {
-	case "member", "contact", "member_picker", "user", "user_picker", "attachment", "file", "image":
-		return "", fmt.Errorf("form type %s is not supported in current version", rawType)
-	default:
-		return "", fmt.Errorf("unsupported form type: %s", rawType)
-	}
 }
 
 func NewSchedulerRuntimeGraph(graphModel *domain.GraphModel, registry NodeRegistry) (*RuntimeGraph, error) {

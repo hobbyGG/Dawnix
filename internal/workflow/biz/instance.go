@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"time"
 
 	"github.com/hobbyGG/Dawnix/internal/workflow/domain"
 )
@@ -9,7 +10,7 @@ import (
 type InstanceRepo interface {
 	// 这里定义Instance相关的数据操作方法
 	Create(ctx context.Context, model *domain.ProcessInstance) (int64, error)
-	List(ctx context.Context, params *ListInstancesParams) ([]domain.ProcessInstance, error)
+	List(ctx context.Context, params *ListInstancesParams) ([]domain.ProcessInstance, int64, error)
 	GetByID(ctx context.Context, id int64) (*domain.ProcessInstance, error)
 	GetWithExecutionsByID(ctx context.Context, id int64) (*domain.ProcessInstance, []domain.Execution, error)
 	Delete(ctx context.Context, id int64) error
@@ -17,9 +18,20 @@ type InstanceRepo interface {
 	UpdateStatus(ctx context.Context, id int64, status string) error
 }
 
+const (
+	ListInstancesStateAll        = "all"
+	ListInstancesStateFinished   = "finished"
+	ListInstancesStateUnfinished = "unfinished"
+)
+
 type ListInstancesParams struct {
-	Page int
-	Size int
+	Page          int
+	Size          int
+	State         string
+	SubmitterID   string
+	ProcessCode   string
+	CreatedAtFrom time.Time
+	CreatedAtTo   time.Time
 }
 
 type InstanceScheduler interface {
