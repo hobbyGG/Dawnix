@@ -34,8 +34,7 @@ func (repo *InstanceRepo) Create(ctx context.Context, inst *domain.ProcessInstan
 func (repo *InstanceRepo) List(ctx context.Context, params *biz.ListInstancesParams) ([]domain.ProcessInstance, int64, error) {
 	var instances []dataModel.ProcessInstance
 	query := repo.db.DB(ctx).WithContext(ctx).
-		Table("process_instances as i").
-		Select("i.*")
+		Table("process_instances as i")
 	query = applyInstanceListFilters(query, params)
 
 	var total int64
